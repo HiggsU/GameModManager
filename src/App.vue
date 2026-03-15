@@ -292,6 +292,7 @@
                 v-for="mod in [...selectedGame.mods].reverse()" 
                 :key="mod.id"
                 class="mod-card"
+                :class="{ disabled: mod.installed === false }"
               >
                 <div class="mod-icon">{{ getModIcon(mod.name) }}</div>
                 <div class="mod-info">
@@ -322,12 +323,31 @@
                       <polyline points="10 9 9 9 8 9"/>
                     </svg>
                   </button>
-                  <button class="btn btn-warning btn-sm" @click="restoreMod(mod.id)" title="还原">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <polyline points="1 4 1 10 7 10"/>
-                      <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+                  
+                  <!-- 安装/卸载开关 -->
+                  <button 
+                    class="btn btn-sm toggle-btn"
+                    :class="mod.installed !== false ? 'btn-success' : 'btn-secondary'"
+                    @click="toggleMod(mod)"
+                    :title="mod.installed !== false ? '点击卸载' : '点击安装'"
+                  >
+                    <svg v-if="mod.installed !== false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="20 6 9 17 4 12"/>
                     </svg>
-                    还原
+                    <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="10"/>
+                      <line x1="12" y1="8" x2="12" y2="16"/>
+                      <line x1="8" y1="12" x2="16" y2="12"/>
+                    </svg>
+                    {{ mod.installed !== false ? '已安装' : '未安装' }}
+                  </button>
+                  
+                  <!-- 删除按钮 -->
+                  <button class="btn btn-danger btn-sm" @click="deleteMod(mod)" title="删除">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="3 6 5 6 21 6"/>
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                    </svg>
                   </button>
                 </div>
               </div>
@@ -434,45 +454,120 @@
 
     <!-- 安装 Mod 弹窗 -->
     <div v-if="showInstallModal" class="modal-overlay">
-      <div class="modal animate-scaleIn">
+      <div class="modal modal-lg animate-scaleIn">
         <div class="modal-header">
           <h3>
             <span class="modal-icon">✨</span>
-            安装 Mod
+            创建 Mod
           </h3>
+          <button class="btn-close" @click="cancelInstall">×</button>
         </div>
         <div class="modal-body">
-          <div class="form-group">
-            <label class="form-label">Mod 名称</label>
-            <input 
-              v-model="installModName" 
-              type="text" 
-              class="form-input" 
-              placeholder="给这个 Mod 起个名字"
-            >
-          </div>
-          <div class="form-group">
-            <label class="form-label">描述（可选）</label>
-            <input 
-              v-model="installModDesc" 
-              type="text" 
-              class="form-input" 
-              placeholder="简要描述这个 Mod"
-            >
-          </div>
-          <div class="install-files">
-            <div class="files-header">
-              <span>待安装文件 ({{ pendingFiles.length }})</span>
-              <button class="btn btn-ghost btn-sm" @click="clearPendingFiles">清空</button>
+          <!-- Mod 基本信息 -->
+          <div class="form-row">
+            <div class="form-group flex-1">
+              <label class="form-label">Mod 名称</label>
+              <input 
+                v-model="installModName" 
+                type="text" 
+                class="form-input" 
+                placeholder="给这个 Mod 起个名字"
+              >
             </div>
-            <div class="files-list">
-              <div v-for="file in pendingFiles.slice(0, 5)" :key="file.path" class="file-item">
-                <span class="file-icon">{{ getFileIcon(file.name) }}</span>
-                <span class="file-name">{{ file.name }}</span>
-                <span class="file-size">{{ formatSize(file.size) }}</span>
+            <div class="form-group flex-2">
+              <label class="form-label">描述（可选）</label>
+              <input 
+                v-model="installModDesc" 
+                type="text" 
+                class="form-input" 
+                placeholder="简要描述这个 Mod"
+              >
+            </div>
+          </div>
+          
+          <!-- 多目录操作区域 -->
+          <div class="mod-dirs-container">
+            <div class="dirs-header">
+              <span>目标目录操作</span>
+              <small>为每个目录添加文件或选择要删除的内容</small>
+            </div>
+            
+            <!-- 遍历所有目标目录 -->
+            <div v-for="op in modOperations" :key="op.dirPath" class="dir-op-card">
+              <div class="dir-op-header" @click="op.expanded = !op.expanded">
+                <div class="dir-op-info">
+                  <span class="dir-op-icon">📁</span>
+                  <div class="dir-op-text">
+                    <span class="dir-op-name">{{ op.dirName }}</span>
+                    <span class="dir-op-path">{{ op.dirPath }}</span>
+                  </div>
+                </div>
+                <div class="dir-op-stats">
+                  <span v-if="op.addFiles.length" class="stat-badge add">
+                    ✨ {{ op.addFiles.length }}
+                  </span>
+                  <span v-if="op.deleteItems.length" class="stat-badge del">
+                    🗑️ {{ op.deleteItems.length }}
+                  </span>
+                  <span class="expand-btn">{{ op.expanded ? '▼' : '▶' }}</span>
+                </div>
               </div>
-              <div v-if="pendingFiles.length > 5" class="file-more">
-                还有 {{ pendingFiles.length - 5 }} 个文件...
+              
+              <div v-show="op.expanded" class="dir-op-body">
+                <!-- 添加文件区域 -->
+                <div class="op-section">
+                  <div class="op-section-header">
+                    <span class="op-section-title">
+                      <span class="status-icon add">✨</span>
+                      添加/替换文件
+                    </span>
+                    <button class="btn btn-secondary btn-xs" @click="selectFilesForDir(op.dirPath)">
+                      + 添加文件
+                    </button>
+                  </div>
+                  <div class="op-section-content">
+                    <div v-if="op.addFiles.length === 0" class="op-empty">
+                      点击"添加文件"或从主界面拖拽文件
+                    </div>
+                    <div v-else class="op-file-list">
+                      <div v-for="(file, idx) in op.addFiles" :key="idx" class="op-file-item">
+                        <span class="file-status" :class="file.status">
+                          {{ file.status === 'new' ? '✨' : '🔄' }}
+                        </span>
+                        <span class="file-icon">{{ getFileIcon(file.name) }}</span>
+                        <span class="file-name">{{ file.relativePath || file.name }}</span>
+                        <span class="file-size">{{ formatSize(file.size) }}</span>
+                        <button class="file-remove-btn" @click="removeFileFromOp(op.dirPath, idx)">×</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- 删除项目区域 -->
+                <div class="op-section">
+                  <div class="op-section-header">
+                    <span class="op-section-title">
+                      <span class="status-icon del">🗑️</span>
+                      删除项目
+                    </span>
+                    <button class="btn btn-danger btn-xs" @click="browseDirForDelete(op.dirPath)">
+                      📂 浏览目录
+                    </button>
+                  </div>
+                  <div class="op-section-content">
+                    <div v-if="op.deleteItems.length === 0" class="op-empty">
+                      点击"浏览目录"选择要删除的文件或文件夹
+                    </div>
+                    <div v-else class="op-file-list">
+                      <div v-for="(item, idx) in op.deleteItems" :key="idx" class="op-file-item delete">
+                        <span class="file-status del">🗑️</span>
+                        <span class="file-icon">{{ item.isDirectory ? '📁' : '📄' }}</span>
+                        <span class="file-name">{{ item.name }}</span>
+                        <button class="file-remove-btn" @click="removeDeleteFromOp(op.dirPath, idx)">×</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -482,9 +577,51 @@
           <button 
             class="btn btn-success" 
             @click="confirmInstall"
-            :disabled="pendingFiles.length === 0"
+            :disabled="!hasAnyOperation"
           >
-            <span>🚀</span> 安装
+            <span>🚀</span> 创建 Mod
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 浏览目录选择删除项弹窗 -->
+    <div v-if="showBrowseModal" class="modal-overlay">
+      <div class="modal animate-scaleIn">
+        <div class="modal-header">
+          <h3>
+            <span class="modal-icon">🗑️</span>
+            选择要删除的项目
+          </h3>
+          <button class="btn-close" @click="showBrowseModal = false">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="browse-path">当前目录: {{ browsingDir }}</div>
+          <div class="browse-list">
+            <div v-if="browseTree.length === 0" class="browse-empty">
+              目录为空
+            </div>
+            <template v-else>
+              <BrowseNode 
+                v-for="node in browseTree" 
+                :key="node.path"
+                :node="node"
+                :selected-paths="selectedForDelete"
+                :depth="0"
+                @toggle-select="toggleSelectForDelete"
+                @toggle-expand="toggleBrowseExpand"
+              />
+            </template>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" @click="showBrowseModal = false">取消</button>
+          <button 
+            class="btn btn-danger" 
+            @click="confirmDeleteSelection"
+            :disabled="selectedForDelete.length === 0"
+          >
+            确认选择 ({{ selectedForDelete.length }})
           </button>
         </div>
       </div>
@@ -500,15 +637,75 @@
           </h3>
           <button class="btn-close" @click="showFilesModal = false">×</button>
         </div>
-        <div class="modal-body">
-          <div class="file-detail-list">
-            <div v-for="file in selectedMod?.files" :key="file.destPath" class="file-detail-item">
-              <span class="file-type" :class="file.operationType">
-                {{ file.operationType === 'replace' ? '🔄' : '✨' }}
-              </span>
-              <span class="file-path">{{ file.relativePath }}</span>
-              <span class="file-size">{{ formatSize(file.size) }}</span>
+        <div class="modal-body mod-files-body">
+          <!-- 统计信息 -->
+          <div class="mod-files-stats">
+            <div class="stat-item">
+              <span class="stat-icon new">✨</span>
+              <span class="stat-label">新增文件</span>
+              <span class="stat-value">{{ selectedMod?.stats?.new || 0 }}</span>
             </div>
+            <div class="stat-item">
+              <span class="stat-icon replace">🔄</span>
+              <span class="stat-label">替换文件</span>
+              <span class="stat-value">{{ selectedMod?.stats?.replaced || 0 }}</span>
+            </div>
+            <div class="stat-item" v-if="selectedMod?.stats?.deleted > 0">
+              <span class="stat-icon delete">🗑️</span>
+              <span class="stat-label">删除项目</span>
+              <span class="stat-value">{{ selectedMod?.stats?.deleted || 0 }}</span>
+            </div>
+          </div>
+          
+          <!-- 删除的项目 -->
+          <div v-if="selectedMod?.deletedItems?.length > 0" class="deleted-section">
+            <div class="deleted-header" @click="deletedExpanded = !deletedExpanded">
+              <span class="expand-icon">{{ deletedExpanded ? '▼' : '▶' }}</span>
+              <span class="deleted-icon">🗑️</span>
+              <span class="deleted-title">已删除的项目</span>
+              <span class="deleted-count">{{ selectedMod.deletedItems.length }} 项</span>
+            </div>
+            <div v-show="deletedExpanded" class="deleted-list">
+              <div v-for="item in selectedMod.deletedItems" :key="item.originalPath" class="deleted-item">
+                <span class="item-icon">{{ item.isDirectory ? '📁' : '📄' }}</span>
+                <span class="item-name">{{ item.relativePath || item.originalPath?.split(/[\\/]/).pop() }}</span>
+                <span class="item-type">{{ item.isDirectory ? '文件夹' : '文件' }}</span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 文件树 -->
+          <div class="mod-files-tree">
+            <template v-for="node in modFilesTree" :key="node.path || node.name">
+              <!-- 文件夹 -->
+              <div v-if="node.children" class="tree-folder">
+                <div class="folder-header" @click="node.expanded = !node.expanded">
+                  <span class="expand-icon">{{ node.expanded ? '▼' : '▶' }}</span>
+                  <span class="folder-icon">📁</span>
+                  <span class="folder-name">{{ node.name }}</span>
+                  <span class="folder-count">{{ node.fileCount }} 个文件</span>
+                </div>
+                <div v-show="node.expanded" class="folder-children">
+                  <div v-for="file in node.children" :key="file.destPath" class="tree-file">
+                    <span class="file-status" :class="file.operationType">
+                      {{ file.operationType === 'replace' ? '🔄' : '✨' }}
+                    </span>
+                    <span class="file-icon">{{ getFileIcon(file.name) }}</span>
+                    <span class="file-name">{{ file.name }}</span>
+                    <span class="file-size">{{ formatSize(file.size) }}</span>
+                  </div>
+                </div>
+              </div>
+              <!-- 单个文件 -->
+              <div v-else class="tree-file root-file">
+                <span class="file-status" :class="node.operationType">
+                  {{ node.operationType === 'replace' ? '🔄' : '✨' }}
+                </span>
+                <span class="file-icon">{{ getFileIcon(node.name) }}</span>
+                <span class="file-name">{{ node.name }}</span>
+                <span class="file-size">{{ formatSize(node.size) }}</span>
+              </div>
+            </template>
           </div>
         </div>
       </div>
@@ -544,6 +741,33 @@
       </div>
     </div>
 
+    <!-- 确认弹窗 -->
+    <div v-if="showConfirmModal" class="modal-overlay">
+      <div class="modal modal-sm animate-scaleIn">
+        <div class="modal-header" :class="'type-' + confirmModal.type">
+          <h3>
+            <span class="modal-icon">
+              {{ confirmModal.type === 'danger' ? '⚠️' : confirmModal.type === 'warning' ? '⚡' : 'ℹ️' }}
+            </span>
+            {{ confirmModal.title }}
+          </h3>
+        </div>
+        <div class="modal-body">
+          <p class="confirm-message">{{ confirmModal.message }}</p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" @click="cancelConfirm">取消</button>
+          <button 
+            class="btn" 
+            :class="confirmModal.type === 'danger' ? 'btn-danger' : 'btn-primary'"
+            @click="confirmModal.onConfirm"
+          >
+            确认
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Toast 提示 -->
     <div v-if="toast.show" class="toast" :class="toast.type">
       <span class="toast-icon">{{ toast.type === 'success' ? '✅' : '❌' }}</span>
@@ -553,10 +777,93 @@
 </template>
 
 <script>
-import { ref, reactive, onMounted, watch } from 'vue'
+import { ref, reactive, onMounted, watch, computed, defineComponent, h, toRaw } from 'vue'
+
+// 递归浏览节点组件
+const BrowseNode = defineComponent({
+  name: 'BrowseNode',
+  props: {
+    node: { type: Object, required: true },
+    selectedPaths: { type: Array, required: true },
+    depth: { type: Number, default: 0 }
+  },
+  emits: ['toggle-select', 'toggle-expand'],
+  setup(props, { emit }) {
+    const isSelected = computed(() => props.selectedPaths.includes(props.node.path))
+    
+    const handleSelect = (e) => {
+      e.stopPropagation()
+      emit('toggle-select', props.node)
+    }
+    
+    const handleExpand = (e) => {
+      e.stopPropagation()
+      if (props.node.isDirectory) {
+        emit('toggle-expand', props.node)
+      }
+    }
+    
+    return () => {
+      const { node, depth, selectedPaths } = props
+      const indent = depth * 20
+      
+      return h('div', { class: 'browse-node-wrapper' }, [
+        // 当前节点行
+        h('div', {
+          class: ['browse-item', { selected: isSelected.value }],
+          style: { paddingLeft: `${indent + 12}px` },
+          onClick: handleSelect
+        }, [
+          // 展开/折叠按钮（仅目录）
+          node.isDirectory ? h('span', {
+            class: 'browse-expand-btn',
+            onClick: handleExpand
+          }, node.expanded ? '▼' : '▶') : h('span', { class: 'browse-expand-placeholder' }),
+          
+          // 复选框
+          h('span', { class: 'browse-checkbox' }, isSelected.value ? '☑' : '☐'),
+          
+          // 图标
+          h('span', { class: 'browse-icon' }, node.isDirectory ? '📁' : '📄'),
+          
+          // 名称
+          h('span', { class: 'browse-name' }, node.name),
+          
+          // 大小（仅文件）
+          !node.isDirectory ? h('span', { class: 'browse-size' }, formatSizeLocal(node.size)) : null
+        ]),
+        
+        // 子节点（展开时）
+        node.isDirectory && node.expanded && node.children ? 
+          node.children.map(child => 
+            h(BrowseNode, {
+              key: child.path,
+              node: child,
+              selectedPaths: selectedPaths,
+              depth: depth + 1,
+              onToggleSelect: (n) => emit('toggle-select', n),
+              onToggleExpand: (n) => emit('toggle-expand', n)
+            })
+          ) : null
+      ])
+    }
+  }
+})
+
+// 格式化大小辅助函数
+function formatSizeLocal(bytes) {
+  if (!bytes) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
+}
 
 export default {
   name: 'App',
+  components: {
+    BrowseNode
+  },
   setup() {
     // 主题模式
     const isLightMode = ref(true) // 默认浅色模式
@@ -578,11 +885,137 @@ export default {
     
     // 待安装文件
     const pendingFiles = ref([])
+    const pendingDeleteItems = ref([]) // 要删除的文件/目录
     const installModName = ref('')
     const installModDesc = ref('')
     
+    // 当前操作的目录
+    const currentOpDir = ref('')
+    // 多目录操作数据
+    const modOperations = ref([]) // [{ dirPath, dirName, addFiles: [], deleteItems: [] }]
+    
+    // 浏览目录选择删除项
+    const showBrowseModal = ref(false)
+    const browsingDir = ref('')
+    const browseTree = ref([]) // 树形结构
+    const selectedForDelete = ref([]) // 改用数组而非Set
+    
+    // 确认弹窗
+    const showConfirmModal = ref(false)
+    const confirmModal = reactive({
+      title: '',
+      message: '',
+      type: 'warning', // warning, danger, info
+      onConfirm: null
+    })
+    
+    // 文件状态缓存（用于预览）
+    const fileStatusCache = ref({})
+    
+    // 计算树状结构
+    const installTree = computed(() => {
+      if (pendingFiles.value.length === 0) return []
+      
+      const tree = []
+      const folderMap = new Map()
+      
+      // 按路径分组构建树
+      for (const file of pendingFiles.value) {
+        const parts = file.relativePath?.split(/[\\/]/) || [file.name]
+        
+        if (parts.length === 1) {
+          tree.push({
+            ...file,
+            name: parts[0],
+            status: fileStatusCache.value[file.relativePath] || 'new',
+            children: null
+          })
+        } else {
+          const folderName = parts[0]
+          
+          if (!folderMap.has(folderName)) {
+            const folderNode = {
+              name: folderName,
+              path: folderName,
+              children: [],
+              fileCount: 0,
+              expanded: true
+            }
+            folderMap.set(folderName, folderNode)
+            tree.push(folderNode)
+          }
+          
+          folderMap.get(folderName).children.push({
+            ...file,
+            name: parts[parts.length - 1],
+            status: fileStatusCache.value[file.relativePath] || 'new'
+          })
+          folderMap.get(folderName).fileCount++
+        }
+      }
+      
+      return tree
+    })
+    
+    // 统计新增和替换
+    const installPreviewStats = computed(() => {
+      let newCount = 0
+      let replaceCount = 0
+      
+      for (const file of pendingFiles.value) {
+        const status = fileStatusCache.value[file.relativePath] || 'new'
+        if (status === 'new') newCount++
+        else replaceCount++
+      }
+      
+      return { new: newCount, replace: replaceCount }
+    })
+    
     // 选中的 Mod
     const selectedMod = ref(null)
+    const deletedExpanded = ref(true)  // 删除项目默认展开
+    
+    // Mod 文件树
+    const modFilesTree = computed(() => {
+      if (!selectedMod.value?.files?.length) return []
+      
+      const tree = []
+      const folderMap = new Map()
+      
+      for (const file of selectedMod.value.files) {
+        const parts = file.relativePath?.split(/[\\/]/) || [file.name]
+        
+        if (parts.length === 1) {
+          tree.push({
+            ...file,
+            name: parts[0],
+            children: null
+          })
+        } else {
+          const folderName = parts[0]
+          
+          if (!folderMap.has(folderName)) {
+            const folderNode = {
+              name: folderName,
+              path: folderName,
+              children: [],
+              fileCount: 0,
+              expanded: true
+            }
+            folderMap.set(folderName, folderNode)
+            tree.push(folderNode)
+          }
+          
+          folderMap.get(folderName).children.push({
+            ...file,
+            name: parts[parts.length - 1]
+          })
+          folderMap.get(folderName).fileCount++
+        }
+      }
+      
+      return tree
+    })
     
     // 编辑
     const editGameName = ref('')
@@ -707,7 +1140,12 @@ export default {
 
     // 删除游戏
     const confirmDeleteGame = async () => {
-      if (!confirm(`确定要删除 "${selectedGame.value.name}"？\n这将删除所有 Mod 备份。`)) return
+      const confirmed = await showConfirm({
+        title: '删除游戏',
+        message: `确定要删除 "${selectedGame.value.name}" 吗？\n\n这将删除所有 Mod 备份，此操作不可撤销。`,
+        type: 'danger'
+      })
+      if (!confirmed) return
       
       await window.electronAPI.deleteGame(selectedGame.value.id)
       games.value = games.value.filter(g => g.id !== selectedGame.value.id)
@@ -728,7 +1166,7 @@ export default {
       games.value[idx].name = editGameName.value
       games.value[idx].rootPath = editGamePath.value
       
-      await window.electronAPI.saveGames(games.value)
+      await window.electronAPI.saveGames(toRaw(games.value))
       selectedGame.value = games.value[idx]
       targetDirectory.value = editGamePath.value
       showSettings.value = false
@@ -750,7 +1188,7 @@ export default {
       games.value[idx].directories = games.value[idx].directories || []
       games.value[idx].directories.push({ name: newDir.name, path: newDir.path })
       
-      await window.electronAPI.saveGames(games.value)
+      await window.electronAPI.saveGames(toRaw(games.value))
       selectedGame.value = games.value[idx]
       targetDirectory.value = newDir.path
       
@@ -765,7 +1203,7 @@ export default {
       if (idx === -1) return
       
       games.value[idx].directories = games.value[idx].directories.filter(d => d.path !== path)
-      await window.electronAPI.saveGames(games.value)
+      await window.electronAPI.saveGames(toRaw(games.value))
       selectedGame.value = games.value[idx]
       
       if (targetDirectory.value === path) {
@@ -773,37 +1211,7 @@ export default {
       }
     }
 
-    // 拖拽处理
-    const handleDrop = async (e) => {
-      isDragging.value = false
-      
-      const items = e.dataTransfer.files
-      pendingFiles.value = []
-      
-      for (const item of items) {
-        const info = await window.electronAPI.getFileInfo(item.path)
-        if (info.exists) {
-          if (info.isDirectory) {
-            // 递归获取文件夹内容
-            const contents = await getDirectoryContents(item.path)
-            pendingFiles.value.push(...contents)
-          } else {
-            pendingFiles.value.push({
-              path: item.path,
-              name: item.name,
-              size: info.size
-            })
-          }
-        }
-      }
-      
-      if (pendingFiles.value.length > 0) {
-        installModName.value = `Mod ${(selectedGame.value.mods?.length || 0) + 1}`
-        installModDesc.value = ''
-        showInstallModal.value = true
-      }
-    }
-
+    // 递归获取目录内容
     const getDirectoryContents = async (dirPath) => {
       const results = []
       const scanDir = async (currentPath, basePath) => {
@@ -828,65 +1236,355 @@ export default {
       return results
     }
 
-    // 选择文件
-    const selectFiles = async () => {
-      const paths = await window.electronAPI.selectFiles()
-      if (!paths?.length) return
+    // 初始化多目录操作数据
+    const initModOperations = () => {
+      modOperations.value = []
       
-      pendingFiles.value = []
+      if (!selectedGame.value) return
       
-      for (const p of paths) {
-        const info = await window.electronAPI.getFileInfo(p)
+      // 添加游戏根目录
+      modOperations.value.push({
+        dirPath: selectedGame.value.rootPath,
+        dirName: '游戏根目录',
+        addFiles: [],
+        deleteItems: [],
+        expanded: true
+      })
+      
+      // 添加自定义目录
+      for (const dir of (selectedGame.value.directories || [])) {
+        modOperations.value.push({
+          dirPath: dir.path,
+          dirName: dir.name,
+          addFiles: [],
+          deleteItems: [],
+          expanded: false
+        })
+      }
+    }
+
+    // 检查是否有任何操作
+    const hasAnyOperation = computed(() => {
+      return modOperations.value.some(op => op.addFiles.length > 0 || op.deleteItems.length > 0)
+    })
+
+    // 拖拽处理
+    const handleDrop = async (e) => {
+      isDragging.value = false
+      
+      const items = e.dataTransfer.files
+      const files = []
+      
+      for (const item of items) {
+        const info = await window.electronAPI.getFileInfo(item.path)
         if (info.exists) {
           if (info.isDirectory) {
-            const contents = await getDirectoryContents(p)
-            pendingFiles.value.push(...contents)
+            const contents = await getDirectoryContents(item.path)
+            files.push(...contents)
           } else {
-            pendingFiles.value.push({
-              path: p,
-              name: p.split(/[\\/]/).pop(),
-              size: info.size
+            files.push({
+              path: item.path,
+              name: item.name,
+              size: info.size,
+              relativePath: item.name
             })
           }
         }
       }
       
-      if (pendingFiles.value.length > 0) {
+      if (files.length > 0) {
+        // 初始化操作数据
+        initModOperations()
+        
+        // 将文件添加到当前选中的目标目录
+        const currentOp = modOperations.value.find(op => op.dirPath === targetDirectory.value)
+        if (currentOp) {
+          // 检查文件状态
+          for (const file of files) {
+            const destPath = currentOp.dirPath + '\\' + (file.relativePath || file.name)
+            const exists = await window.electronAPI.pathExists(destPath)
+            file.status = exists ? 'replace' : 'new'
+          }
+          currentOp.addFiles = files
+        }
+        
         installModName.value = `Mod ${(selectedGame.value.mods?.length || 0) + 1}`
         installModDesc.value = ''
         showInstallModal.value = true
       }
     }
 
-    const clearPendingFiles = () => {
-      pendingFiles.value = []
+    // 选择文件（为当前目录）
+    const selectFiles = async () => {
+      const paths = await window.electronAPI.selectFiles()
+      if (!paths?.length) return
+      
+      const files = []
+      
+      for (const p of paths) {
+        const info = await window.electronAPI.getFileInfo(p)
+        if (info.exists) {
+          if (info.isDirectory) {
+            const contents = await getDirectoryContents(p)
+            files.push(...contents)
+          } else {
+            const fileName = p.split(/[\\/]/).pop()
+            files.push({
+              path: p,
+              name: fileName,
+              size: info.size,
+              relativePath: fileName
+            })
+          }
+        }
+      }
+      
+      if (files.length > 0) {
+        // 初始化操作数据
+        initModOperations()
+        
+        // 将文件添加到当前选中的目标目录
+        const currentOp = modOperations.value.find(op => op.dirPath === targetDirectory.value)
+        if (currentOp) {
+          // 检查文件状态
+          for (const file of files) {
+            const destPath = currentOp.dirPath + '\\' + (file.relativePath || file.name)
+            const exists = await window.electronAPI.pathExists(destPath)
+            file.status = exists ? 'replace' : 'new'
+          }
+          currentOp.addFiles = files
+        }
+        
+        installModName.value = `Mod ${(selectedGame.value.mods?.length || 0) + 1}`
+        installModDesc.value = ''
+        showInstallModal.value = true
+      }
+    }
+
+    // 为指定目录选择文件
+    const selectFilesForDir = async (dirPath) => {
+      const paths = await window.electronAPI.selectFiles()
+      if (!paths?.length) return
+      
+      const files = []
+      
+      for (const p of paths) {
+        const info = await window.electronAPI.getFileInfo(p)
+        if (info.exists) {
+          if (info.isDirectory) {
+            const contents = await getDirectoryContents(p)
+            files.push(...contents)
+          } else {
+            const fileName = p.split(/[\\/]/).pop()
+            files.push({
+              path: p,
+              name: fileName,
+              size: info.size,
+              relativePath: fileName
+            })
+          }
+        }
+      }
+      
+      // 检查文件状态并添加
+      const op = modOperations.value.find(o => o.dirPath === dirPath)
+      if (op) {
+        for (const file of files) {
+          const destPath = dirPath + '\\' + (file.relativePath || file.name)
+          const exists = await window.electronAPI.pathExists(destPath)
+          file.status = exists ? 'replace' : 'new'
+        }
+        op.addFiles.push(...files)
+      }
+    }
+
+    // 从操作中移除文件
+    const removeFileFromOp = (dirPath, index) => {
+      const op = modOperations.value.find(o => o.dirPath === dirPath)
+      if (op) {
+        op.addFiles.splice(index, 1)
+      }
+    }
+
+    // 从操作中移除删除项
+    const removeDeleteFromOp = (dirPath, index) => {
+      const op = modOperations.value.find(o => o.dirPath === dirPath)
+      if (op) {
+        op.deleteItems.splice(index, 1)
+      }
+    }
+
+    // 浏览目录选择要删除的项目
+    const browseDirForDelete = async (dirPath) => {
+      browsingDir.value = dirPath
+      selectedForDelete.value = []
+      
+      // 加载根目录内容
+      browseTree.value = await loadBrowseChildrenInternal(dirPath)
+      
+      showBrowseModal.value = true
+    }
+    
+    // 内部函数：加载子目录内容
+    const loadBrowseChildrenInternal = async (parentPath) => {
+      const result = await window.electronAPI.listDirectory(parentPath)
+      if (!result.success) return []
+      
+      return result.files.map(item => ({
+        ...item,
+        expanded: false,
+        loaded: false,
+        children: null
+      }))
+    }
+    
+    // 切换目录展开
+    const toggleBrowseExpand = async (node) => {
+      if (!node.isDirectory) return
+      
+      if (!node.loaded) {
+        // 首次展开，加载子目录
+        node.children = await loadBrowseChildrenInternal(node.path)
+        node.loaded = true
+      }
+      node.expanded = !node.expanded
+      // 触发响应式更新
+      browseTree.value = [...browseTree.value]
+    }
+    
+    // 加载子节点（用于递归组件）
+    const loadBrowseChildren = async (node) => {
+      if (!node.isDirectory) return
+      node.children = await loadBrowseChildrenInternal(node.path)
+      node.loaded = true
+      node.expanded = true
+      browseTree.value = [...browseTree.value]
+    }
+
+    // 切换选择删除项
+    const toggleSelectForDelete = (item) => {
+      const index = selectedForDelete.value.indexOf(item.path)
+      if (index > -1) {
+        // 取消选择：移除该项及其所有子项
+        removeSelectionRecursive(item)
+      } else {
+        // 选择：添加该项
+        selectedForDelete.value.push(item.path)
+        // 如果是目录，同时选择所有子项
+        if (item.isDirectory && item.children) {
+          selectChildrenRecursive(item)
+        }
+      }
+    }
+    
+    // 递归选择所有子项
+    const selectChildrenRecursive = (node) => {
+      if (node.children) {
+        for (const child of node.children) {
+          if (!selectedForDelete.value.includes(child.path)) {
+            selectedForDelete.value.push(child.path)
+          }
+          if (child.children) {
+            selectChildrenRecursive(child)
+          }
+        }
+      }
+    }
+    
+    // 递归移除选择
+    const removeSelectionRecursive = (node) => {
+      const idx = selectedForDelete.value.indexOf(node.path)
+      if (idx > -1) {
+        selectedForDelete.value.splice(idx, 1)
+      }
+      if (node.children) {
+        for (const child of node.children) {
+          removeSelectionRecursive(child)
+        }
+      }
+    }
+
+    // 确认删除选择
+    const confirmDeleteSelection = () => {
+      const op = modOperations.value.find(o => o.dirPath === browsingDir.value)
+      if (op) {
+        // 遍历选中的路径
+        for (const path of selectedForDelete.value) {
+          // 检查是否已存在
+          if (!op.deleteItems.some(d => d.path === path)) {
+            // 从树中找到对应节点获取信息
+            const findNode = (nodes, targetPath) => {
+              for (const node of nodes) {
+                if (node.path === targetPath) return node
+                if (node.children) {
+                  const found = findNode(node.children, targetPath)
+                  if (found) return found
+                }
+              }
+              return null
+            }
+            const node = findNode(browseTree.value, path)
+            if (node) {
+              op.deleteItems.push({
+                path: node.path,
+                name: node.name,
+                isDirectory: node.isDirectory,
+                size: node.size
+              })
+            }
+          }
+        }
+      }
+      showBrowseModal.value = false
     }
 
     const cancelInstall = () => {
       showInstallModal.value = false
-      pendingFiles.value = []
+      modOperations.value = []
     }
 
     const confirmInstall = async () => {
-      if (pendingFiles.value.length === 0) return
+      if (!hasAnyOperation.value) return
       
       showInstallModal.value = false
       
+      // 收集所有目录的操作
+      const allSourceItems = []
+      const allDeleteItems = []
+      
+      for (const op of modOperations.value) {
+        // 添加文件
+        for (const file of op.addFiles) {
+          allSourceItems.push({
+            path: file.path,
+            relativePath: file.relativePath || file.name,
+            targetDir: op.dirPath
+          })
+        }
+        // 删除项
+        for (const item of op.deleteItems) {
+          allDeleteItems.push({
+            path: item.path,
+            isDirectory: item.isDirectory
+          })
+        }
+      }
+      
       const result = await window.electronAPI.installMod({
         gameId: selectedGame.value.id,
-        modName: installModName.value,
-        modDescription: installModDesc.value,
-        sourceItems: [...new Set(pendingFiles.value.map(f => f.path))],
-        targetDir: targetDirectory.value
+        modName: installModName.value || '未命名 Mod',
+        modDescription: installModDesc.value || '',
+        sourceItems: allSourceItems,
+        deleteItems: allDeleteItems
       })
       
       if (result.success) {
         await loadGames()
         selectedGame.value = games.value.find(g => g.id === selectedGame.value.id)
-        showToast(`Mod "${installModName.value}" 安装成功！`)
-        pendingFiles.value = []
+        showToast(`Mod "${installModName.value}" 创建成功！`)
+        modOperations.value = []
       } else {
-        showToast('安装失败: ' + result.error, 'error')
+        showToast('创建失败: ' + result.error, 'error')
       }
     }
 
@@ -896,25 +1594,123 @@ export default {
       showFilesModal.value = true
     }
 
-    const restoreMod = async (modId) => {
-      if (!confirm('确定要还原这个 Mod 吗？\n这将恢复被替换的文件并删除新增的文件。')) return
+    // 显示确认弹窗
+    const showConfirm = (options) => {
+      return new Promise((resolve) => {
+        confirmModal.title = options.title || '确认'
+        confirmModal.message = options.message || ''
+        confirmModal.type = options.type || 'warning'
+        confirmModal.onConfirm = () => {
+          showConfirmModal.value = false
+          resolve(true)
+        }
+        showConfirmModal.value = true
+        
+        // 点击取消或关闭
+        window._confirmResolve = resolve
+      })
+    }
+    
+    const cancelConfirm = () => {
+      showConfirmModal.value = false
+      if (window._confirmResolve) {
+        window._confirmResolve(false)
+        window._confirmResolve = null
+      }
+    }
+
+    // 切换 Mod 安装状态
+    const toggleMod = async (mod) => {
+      if (mod.installed !== false) {
+        // 当前已安装，执行卸载
+        const confirmed = await showConfirm({
+          title: '卸载 Mod',
+          message: `确定要卸载 "${mod.name}" 吗？\n这将恢复被替换的文件并删除新增的文件。`,
+          type: 'danger'
+        })
+        if (!confirmed) return
+        
+        const result = await window.electronAPI.restoreMod({
+          gameId: selectedGame.value.id,
+          modId: mod.id
+        })
+        
+        if (result.success) {
+          await loadGames()
+          selectedGame.value = games.value.find(g => g.id === selectedGame.value.id)
+          showToast(`Mod "${mod.name}" 已卸载`, 'success')
+        } else {
+          showToast('卸载失败: ' + result.error, 'error')
+        }
+      } else {
+        // 当前未安装，执行安装
+        const result = await window.electronAPI.reinstallMod({
+          gameId: selectedGame.value.id,
+          modId: mod.id
+        })
+        
+        if (result.success) {
+          await loadGames()
+          selectedGame.value = games.value.find(g => g.id === selectedGame.value.id)
+          showToast(`Mod "${mod.name}" 已安装`, 'success')
+        } else {
+          showToast('安装失败: ' + result.error, 'error')
+        }
+      }
+    }
+
+    // 删除 Mod
+    const deleteMod = async (mod) => {
+      const isInstalled = mod.installed !== false
       
-      const result = await window.electronAPI.restoreMod({
+      let message = ''
+      if (isInstalled) {
+        message = `该 Mod 当前已安装，删除后：\n• 将还原所有被修改的文件\n• 删除所有备份文件\n• 此操作不可撤销\n\n是否继续？`
+      } else {
+        message = `将删除该 Mod 的配置记录，此操作不可撤销。`
+      }
+      
+      const confirmed = await showConfirm({
+        title: `删除 "${mod.name}"`,
+        message: message,
+        type: 'danger'
+      })
+      if (!confirmed) return
+      
+      // 如果已安装，先还原
+      if (isInstalled) {
+        const restoreResult = await window.electronAPI.restoreMod({
+          gameId: selectedGame.value.id,
+          modId: mod.id
+        })
+        if (!restoreResult.success) {
+          showToast('还原失败: ' + restoreResult.error, 'error')
+          return
+        }
+      }
+      
+      // 删除记录
+      const result = await window.electronAPI.deleteModHistory({
         gameId: selectedGame.value.id,
-        modId: modId
+        modId: mod.id
       })
       
       if (result.success) {
         await loadGames()
         selectedGame.value = games.value.find(g => g.id === selectedGame.value.id)
-        showToast('Mod 已还原')
+        showToast(`Mod "${mod.name}" 已删除`)
       } else {
-        showToast('还原失败: ' + result.error, 'error')
+        showToast('删除失败: ' + result.error, 'error')
       }
     }
 
     const restoreAllMods = async () => {
-      if (!confirm('确定要还原所有 Mod 吗？\n这将恢复游戏到安装 Mod 之前的状态。')) return
+      const confirmed = await showConfirm({
+        title: '还原所有 Mod',
+        message: '确定要还原所有 Mod 吗？\n\n这将恢复游戏到安装 Mod 之前的状态，所有 Mod 将变为未安装状态。',
+        type: 'warning'
+      })
+      if (!confirmed) return
       
       const result = await window.electronAPI.restoreAllMods({
         gameId: selectedGame.value.id
@@ -941,9 +1737,12 @@ export default {
       isLightMode,
       games, selectedGame, targetDirectory,
       showAddGameModal, showAddDirModal, showInstallModal, showFilesModal, showSettings,
-      isDragging, pendingFiles, installModName, installModDesc,
-      selectedMod, editGameName, editGamePath, toast,
+      isDragging, installModName, installModDesc,
+      selectedMod, modFilesTree, deletedExpanded, editGameName, editGamePath, toast,
       newGame, newDir,
+      modOperations, hasAnyOperation,
+      showBrowseModal, browsingDir, browseTree, selectedForDelete,
+      showConfirmModal, confirmModal,
       
       showToast, getGameIcon, getModIcon, getFileIcon, formatSize, formatDate,
       minimizeWindow, maximizeWindow, closeWindow, toggleTheme,
@@ -951,8 +1750,10 @@ export default {
       openAddGameModal, closeAddGameModal, selectGameRootPath, addGame,
       confirmDeleteGame, selectEditPath, updateGame,
       selectDirPath, addDirectory, removeDirectory,
-      handleDrop, selectFiles, clearPendingFiles, cancelInstall, confirmInstall,
-      showModFiles, restoreMod, restoreAllMods
+      handleDrop, selectFiles, cancelInstall, confirmInstall,
+      selectFilesForDir, removeFileFromOp, removeDeleteFromOp,
+      browseDirForDelete, toggleBrowseExpand, loadBrowseChildren, toggleSelectForDelete, confirmDeleteSelection,
+      showModFiles, toggleMod, deleteMod, restoreAllMods, cancelConfirm
     }
   }
 }
@@ -1626,15 +2427,17 @@ export default {
   align-items: center;
   gap: 16px;
   padding: 16px;
-  background: rgba(31, 41, 55, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 16px;
   transition: all 0.2s;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .mod-card:hover {
-  background: rgba(31, 41, 55, 0.8);
-  border-color: rgba(233, 69, 96, 0.3);
+  background: rgba(15, 23, 42, 0.9);
+  border-color: rgba(233, 69, 96, 0.4);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
 }
 
 .mod-icon {
@@ -1703,6 +2506,41 @@ export default {
   gap: 8px;
 }
 
+/* Toggle Button */
+.toggle-btn {
+  min-width: 90px;
+  justify-content: center;
+}
+
+.toggle-btn.btn-success {
+  background: linear-gradient(135deg, #10b981, #059669);
+  border-color: transparent;
+}
+
+.toggle-btn.btn-success:hover {
+  background: linear-gradient(135deg, #059669, #047857);
+}
+
+.toggle-btn.btn-secondary {
+  background: rgba(113, 128, 150, 0.2);
+  border-color: rgba(113, 128, 150, 0.3);
+  color: #a0aec0;
+}
+
+.toggle-btn.btn-secondary:hover {
+  background: rgba(113, 128, 150, 0.3);
+}
+
+/* Mod Card Disabled State */
+.mod-card.disabled {
+  opacity: 0.6;
+  background: rgba(31, 41, 55, 0.3);
+}
+
+.mod-card.disabled .mod-icon {
+  filter: grayscale(1);
+}
+
 /* ===== Modal ===== */
 .modal-overlay {
   position: fixed;
@@ -1731,6 +2569,33 @@ export default {
 
 .modal-lg {
   max-width: 640px;
+}
+
+.modal-sm {
+  max-width: 380px;
+}
+
+.modal-header.type-danger {
+  background: rgba(239, 68, 68, 0.1);
+  border-bottom-color: rgba(239, 68, 68, 0.2);
+}
+
+.modal-header.type-warning {
+  background: rgba(245, 158, 11, 0.1);
+  border-bottom-color: rgba(245, 158, 11, 0.2);
+}
+
+.modal-header.type-info {
+  background: rgba(99, 102, 241, 0.1);
+  border-bottom-color: rgba(99, 102, 241, 0.2);
+}
+
+.confirm-message {
+  font-size: 14px;
+  color: #e2e8f0;
+  line-height: 1.6;
+  margin: 0;
+  white-space: pre-wrap;
 }
 
 .modal-header {
@@ -1881,6 +2746,228 @@ export default {
   padding: 8px;
   color: #718096;
   font-size: 12px;
+}
+
+/* ===== Mod Files Tree ===== */
+.mod-files-body {
+  max-height: 70vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.mod-files-stats {
+  display: flex;
+  gap: 20px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+.mod-files-stats .stat-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mod-files-stats .stat-icon {
+  font-size: 18px;
+}
+
+.mod-files-stats .stat-icon.new { color: #10b981; }
+.mod-files-stats .stat-icon.replace { color: #f59e0b; }
+.mod-files-stats .stat-icon.total { color: #a78bfa; }
+.mod-files-stats .stat-icon.delete { color: #ef4444; }
+
+.mod-files-stats .stat-label {
+  color: #718096;
+  font-size: 13px;
+}
+
+.mod-files-stats .stat-value {
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+/* ===== Deleted Section ===== */
+.deleted-section {
+  margin-bottom: 16px;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.deleted-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: rgba(239, 68, 68, 0.1);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.deleted-header:hover {
+  background: rgba(239, 68, 68, 0.15);
+}
+
+.deleted-header .expand-icon {
+  color: #ef4444;
+  font-size: 10px;
+  width: 14px;
+  text-align: center;
+}
+
+.deleted-header .deleted-icon {
+  font-size: 16px;
+}
+
+.deleted-header .deleted-title {
+  flex: 1;
+  color: #fca5a5;
+  font-weight: 500;
+}
+
+.deleted-header .deleted-count {
+  color: #ef4444;
+  font-size: 12px;
+  background: rgba(239, 68, 68, 0.2);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.deleted-list {
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.deleted-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.deleted-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.deleted-item .item-icon {
+  font-size: 14px;
+}
+
+.deleted-item .item-name {
+  flex: 1;
+  color: #e2e8f0;
+  font-size: 13px;
+}
+
+.deleted-item .item-type {
+  color: #718096;
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.mod-files-tree {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.mod-files-tree .tree-folder {
+  margin-bottom: 8px;
+}
+
+.mod-files-tree .folder-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.mod-files-tree .folder-header:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.mod-files-tree .expand-icon {
+  color: #718096;
+  font-size: 10px;
+  width: 14px;
+  text-align: center;
+}
+
+.mod-files-tree .folder-icon {
+  font-size: 16px;
+}
+
+.mod-files-tree .folder-name {
+  flex: 1;
+  color: #fff;
+  font-weight: 500;
+}
+
+.mod-files-tree .folder-count {
+  color: #718096;
+  font-size: 12px;
+}
+
+.mod-files-tree .folder-children {
+  padding-left: 24px;
+  margin-top: 4px;
+  border-left: 1px solid rgba(255, 255, 255, 0.05);
+  margin-left: 18px;
+}
+
+.mod-files-tree .tree-file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.mod-files-tree .tree-file:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.mod-files-tree .tree-file.root-file {
+  margin-bottom: 4px;
+}
+
+.mod-files-tree .file-status {
+  font-size: 14px;
+}
+
+.mod-files-tree .file-status.new { color: #10b981; }
+.mod-files-tree .file-status.replace { color: #f59e0b; }
+
+.mod-files-tree .file-icon {
+  font-size: 14px;
+}
+
+.mod-files-tree .file-name {
+  flex: 1;
+  color: #e2e8f0;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mod-files-tree .file-size {
+  color: #718096;
+  font-size: 11px;
 }
 
 /* ===== File Detail List ===== */
@@ -2179,12 +3266,15 @@ export default {
 }
 
 .light-mode .mod-card {
-  background: rgba(255, 255, 255, 0.8);
-  border-color: rgba(0, 0, 0, 0.06);
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .light-mode .mod-card:hover {
-  background: rgba(255, 255, 255, 0.95);
+  background: #ffffff;
+  border-color: rgba(233, 69, 96, 0.4);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
 }
 
 .light-mode .mod-title h4 {
@@ -2198,6 +3288,22 @@ export default {
 .light-mode .modal {
   background: #ffffff;
   border-color: rgba(0, 0, 0, 0.1);
+}
+
+.light-mode .modal-header.type-danger {
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.light-mode .modal-header.type-warning {
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.light-mode .modal-header.type-info {
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.light-mode .confirm-message {
+  color: #2d3748;
 }
 
 .light-mode .modal-header h3 {
@@ -2239,6 +3345,70 @@ export default {
   color: #4a5568;
 }
 
+.light-mode .mod-files-stats {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.light-mode .mod-files-stats .stat-label {
+  color: #4a5568;
+}
+
+.light-mode .mod-files-stats .stat-value {
+  color: #1a1a2e;
+}
+
+.light-mode .mod-files-tree .folder-header {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.light-mode .mod-files-tree .folder-header:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.light-mode .mod-files-tree .folder-name {
+  color: #1a1a2e;
+}
+
+.light-mode .mod-files-tree .folder-children {
+  border-left-color: rgba(0, 0, 0, 0.08);
+}
+
+.light-mode .mod-files-tree .tree-file:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.light-mode .mod-files-tree .file-name {
+  color: #2d3748;
+}
+
+.light-mode .deleted-section {
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.light-mode .deleted-header {
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.light-mode .deleted-header:hover {
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.light-mode .deleted-header .deleted-title {
+  color: #dc2626;
+}
+
+.light-mode .deleted-list {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.light-mode .deleted-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.light-mode .deleted-item .item-name {
+  color: #374151;
+}
+
 .light-mode .toast {
   background: #ffffff;
   color: #1a1a2e;
@@ -2267,5 +3437,930 @@ export default {
 .light-mode .btn-close {
   background: rgba(0, 0, 0, 0.05);
   color: #1a1a2e;
+}
+
+/* Light mode for install stats */
+.light-mode .install-stats {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.light-mode .install-stats .stat-label {
+  color: #718096;
+}
+
+.light-mode .install-stats .stat-value {
+  color: #1a1a2e;
+}
+
+/* Light mode for install tree */
+.light-mode .install-tree {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+.light-mode .install-tree .tree-header {
+  background: rgba(0, 0, 0, 0.03);
+  border-bottom-color: rgba(0, 0, 0, 0.05);
+}
+
+.light-mode .install-tree .tree-folder {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.light-mode .install-tree .folder-header:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.light-mode .install-tree .folder-name {
+  color: #1a1a2e;
+}
+
+.light-mode .install-tree .tree-file {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.light-mode .install-tree .tree-file:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.light-mode .install-tree .file-name {
+  color: #2d3748;
+}
+
+.light-mode .install-tree .file-path {
+  color: #718096;
+}
+
+.light-mode .install-tree .delete-file {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.15);
+}
+
+/* ===== Install Columns (两列布局) ===== */
+.form-row {
+  display: flex;
+  gap: 16px;
+}
+
+.form-row .form-group {
+  margin-bottom: 16px;
+}
+
+.form-row .flex-1 {
+  flex: 1;
+}
+
+.form-row .flex-2 {
+  flex: 2;
+}
+
+.install-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.install-column {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.column-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 13px;
+  font-weight: 600;
+  color: #a0aec0;
+}
+
+.column-content {
+  max-height: 250px;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.empty-column {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 80px;
+  color: #718096;
+  font-size: 13px;
+}
+
+.delete-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.delete-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.delete-item:hover {
+  background: rgba(239, 68, 68, 0.15);
+}
+
+.delete-icon {
+  font-size: 16px;
+}
+
+.delete-path {
+  flex: 1;
+  font-size: 12px;
+  color: #a0aec0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.delete-remove {
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: rgba(239, 68, 68, 0.3);
+  color: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.delete-remove:hover {
+  background: #ef4444;
+}
+
+/* ===== Mod Dirs Container ===== */
+.mod-dirs-container {
+  margin-top: 16px;
+}
+
+.dirs-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.dirs-header span {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.dirs-header small {
+  font-size: 12px;
+  color: #718096;
+}
+
+.dir-op-card {
+  background: rgba(30, 41, 59, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.dir-op-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.dir-op-header:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.dir-op-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dir-op-icon {
+  font-size: 20px;
+}
+
+.dir-op-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dir-op-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.dir-op-path {
+  font-size: 11px;
+  color: #718096;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dir-op-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stat-badge {
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+.stat-badge.add {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.stat-badge.del {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.expand-btn {
+  font-size: 10px;
+  color: #718096;
+  width: 20px;
+  text-align: center;
+}
+
+.dir-op-body {
+  padding: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.op-section {
+  margin-bottom: 16px;
+}
+
+.op-section:last-child {
+  margin-bottom: 0;
+}
+
+.op-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.op-section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #a0aec0;
+}
+
+.status-icon.add {
+  color: #10b981;
+}
+
+.status-icon.del {
+  color: #ef4444;
+}
+
+.op-section-content {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.op-empty {
+  text-align: center;
+  padding: 16px;
+  color: #718096;
+  font-size: 13px;
+}
+
+.op-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.op-file-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+}
+
+.op-file-item.delete {
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.op-file-item .file-status {
+  font-size: 12px;
+  width: 18px;
+  text-align: center;
+}
+
+.op-file-item .file-status.add {
+  color: #10b981;
+}
+
+.op-file-item .file-status.del {
+  color: #ef4444;
+}
+
+.op-file-item .file-icon {
+  font-size: 14px;
+}
+
+.op-file-item .file-name {
+  flex: 1;
+  font-size: 12px;
+  color: #e2e8f0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.op-file-item .file-size {
+  font-size: 11px;
+  color: #718096;
+}
+
+.file-remove-btn {
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: rgba(239, 68, 68, 0.3);
+  color: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.op-file-item:hover .file-remove-btn {
+  opacity: 1;
+}
+
+.file-remove-btn:hover {
+  background: #ef4444;
+}
+
+/* Browse Modal */
+.browse-path {
+  font-size: 12px;
+  color: #718096;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+}
+
+.browse-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.browse-empty {
+  text-align: center;
+  padding: 24px;
+  color: #718096;
+}
+
+.browse-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.browse-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.browse-item.selected {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.browse-checkbox {
+  font-size: 16px;
+  color: #718096;
+  width: 20px;
+}
+
+.browse-item.selected .browse-checkbox {
+  color: #ef4444;
+}
+
+.browse-icon {
+  font-size: 18px;
+}
+
+.browse-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: #e2e8f0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-right: 16px;
+}
+
+.browse-size {
+  font-size: 11px;
+  color: #94a3b8;
+  flex-shrink: 0;
+  padding: 3px 10px;
+  background: rgba(100, 116, 139, 0.2);
+  border-radius: 4px;
+  font-weight: 500;
+  margin-left: auto;
+}
+
+/* Button sizes */
+.btn-xs {
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
+/* Light mode */
+.light-mode .dir-op-card {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+.light-mode .dir-op-header:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.light-mode .dir-op-name {
+  color: #1a1a2e;
+}
+
+.light-mode .dir-op-body {
+  border-top-color: rgba(0, 0, 0, 0.05);
+}
+
+.light-mode .op-section-content {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.light-mode .op-file-item {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.light-mode .op-file-item .file-name {
+  color: #2d3748;
+}
+
+.light-mode .browse-item:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.light-mode .browse-item.selected {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.light-mode .browse-name {
+  color: #2d3748;
+}
+
+.light-mode .browse-path {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+/* ===== Install Stats ===== */
+.install-stats {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+}
+
+.install-stats .stat-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.install-stats .stat-icon {
+  font-size: 16px;
+}
+
+.install-stats .stat-icon.new {
+  color: #10b981;
+}
+
+.install-stats .stat-icon.replace {
+  color: #f59e0b;
+}
+
+.install-stats .stat-label {
+  font-size: 12px;
+  color: #718096;
+}
+
+.install-stats .stat-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+}
+
+/* ===== Install Actions ===== */
+.install-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+/* ===== Install Tree ===== */
+.install-tree {
+  background: rgba(30, 41, 59, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.install-tree .tree-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 13px;
+  font-weight: 600;
+  color: #a0aec0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.install-tree .tree-content {
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.install-tree .tree-node {
+  margin-bottom: 4px;
+}
+
+.install-tree .tree-folder {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.install-tree .folder-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.install-tree .folder-header:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.install-tree .expand-icon {
+  font-size: 10px;
+  color: #a0aec0;
+  width: 12px;
+}
+
+.install-tree .folder-icon {
+  font-size: 18px;
+}
+
+.install-tree .folder-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.install-tree .folder-count {
+  font-size: 12px;
+  color: #718096;
+}
+
+.install-tree .folder-children {
+  padding: 0 12px 8px 32px;
+}
+
+.install-tree .tree-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  transition: background 0.2s;
+  background: rgba(255, 255, 255, 0.02);
+  margin-bottom: 4px;
+}
+
+.install-tree .tree-file:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.install-tree .file-status {
+  font-size: 14px;
+  width: 20px;
+  text-align: center;
+}
+
+.install-tree .file-status.new {
+  color: #10b981;
+}
+
+.install-tree .file-status.replace {
+  color: #f59e0b;
+}
+
+.install-tree .file-status.delete {
+  color: #ef4444;
+}
+
+.install-tree .file-icon {
+  font-size: 16px;
+}
+
+.install-tree .file-name {
+  flex: 1;
+  font-size: 13px;
+  color: #e2e8f0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.install-tree .file-path {
+  font-size: 11px;
+  color: #718096;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.install-tree .file-remove {
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: rgba(239, 68, 68, 0.3);
+  color: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: all 0.2s;
+}
+
+.install-tree .tree-file:hover .file-remove {
+  opacity: 1;
+}
+
+.install-tree .file-remove:hover {
+  background: #ef4444;
+}
+
+.install-tree .delete-file {
+  background: rgba(239, 68, 68, 0.05);
+  border: 1px solid rgba(239, 68, 68, 0.1);
+}
+
+/* ===== Browse Tree Styles ===== */
+.browse-list {
+  max-height: 500px;
+  overflow-y: auto;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+}
+
+.browse-empty {
+  padding: 40px;
+  text-align: center;
+  color: #718096;
+}
+
+.browse-node-wrapper {
+  user-select: none;
+}
+
+.browse-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  transition: background 0.2s;
+  background: rgba(255, 255, 255, 0.02);
+  margin-bottom: 4px;
+  cursor: pointer;
+}
+
+.browse-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.browse-item.selected {
+  background: rgba(239, 68, 68, 0.1);
+  border-left: 3px solid #ef4444;
+  padding-left: 9px;
+}
+
+.browse-expand-btn {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  color: #718096;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.browse-expand-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+}
+
+.browse-expand-placeholder {
+  width: 18px;
+  flex-shrink: 0;
+}
+
+.browse-checkbox {
+  font-size: 18px;
+  width: 24px;
+  text-align: center;
+  flex-shrink: 0;
+  color: #6366f1;
+}
+
+.browse-item.selected .browse-checkbox {
+  color: #ef4444;
+}
+
+.browse-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.browse-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: #e2e8f0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-right: 16px;
+}
+
+.browse-size {
+  font-size: 11px;
+  color: #94a3b8;
+  flex-shrink: 0;
+  padding: 3px 10px;
+  background: rgba(100, 116, 139, 0.2);
+  border-radius: 4px;
+  font-weight: 500;
+  margin-left: auto;
+}
+
+.browse-path {
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+  font-size: 12px;
+  color: #718096;
+  word-break: break-all;
+}
+
+/* Light mode browse styles */
+.light-mode .browse-list {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.light-mode .browse-item {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.light-mode .browse-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.light-mode .browse-item.selected {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-left: 3px solid #ef4444;
+}
+
+.light-mode :deep(.browse-name) {
+  color: #1a202c !important;
+  font-weight: 500;
+}
+
+.light-mode :deep(.browse-size) {
+  color: #64748b !important;
+  background: rgba(100, 116, 139, 0.12);
+}
+
+.light-mode .browse-path {
+  background: rgba(0, 0, 0, 0.06);
+  color: #2d3748 !important;
+}
+
+.light-mode :deep(.browse-checkbox) {
+  color: #4a5568 !important;
+  font-size: 20px;
+}
+
+.light-mode :deep(.browse-item.selected .browse-checkbox) {
+  color: #ef4444 !important;
+}
+
+.light-mode :deep(.browse-expand-btn) {
+  color: #4a5568 !important;
+}
+
+.light-mode :deep(.browse-expand-btn:hover) {
+  background: rgba(0, 0, 0, 0.08);
+  color: #1a202c !important;
+}
+
+.light-mode :deep(.browse-icon) {
+  filter: none;
+}
+</style>
+
+<!-- 非作用域样式，用于确保浏览弹窗在白天模式下正确显示 -->
+<style>
+.light-mode .browse-name {
+  color: #1a202c !important;
+}
+
+.light-mode .browse-size {
+  color: #64748b !important;
+  background: rgba(100, 116, 139, 0.15) !important;
+}
+
+.light-mode .browse-checkbox {
+  color: #4a5568 !important;
+}
+
+.light-mode .browse-item.selected .browse-checkbox {
+  color: #ef4444 !important;
+}
+
+.light-mode .browse-expand-btn {
+  color: #4a5568 !important;
 }
 </style>
