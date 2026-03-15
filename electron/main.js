@@ -26,6 +26,31 @@ async function saveGames(games) {
   await fs.writeJson(gamesFile, games, { spaces: 2 })
 }
 
+// ========== 递归扫描目录 ==========
+async function scanDirectory(dirPath, basePath = dirPath) {
+  const results = []
+  try {
+    const items = await fs.readdir(dirPath)
+    for (const item of items) {
+      const fullPath = path.join(dirPath, item)
+      const stats = await fs.stat(fullPath).catch(() => null)
+      if (!stats) continue
+      
+      if (stats.isDirectory()) {
+        const subFiles = await scanDirectory(fullPath, basePath)
+        results.push(...subFiles)
+      } else {
+        results.push({
+          path: fullPath,
+          relativePath: path.relative(basePath, fullPath),
+          size: stats.size
+        })
+      }
+    }
+  } catch {}
+  return results
+}
+
 // ========== 创建窗口 ==========
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -34,7 +59,6 @@ function createWindow() {
     minWidth: 1000,
     minHeight: 700,
     frame: false,
-    titleBarStyle: 'hidden',
     backgroundColor: '#1a1a2e',
     webPreferences: {
       nodeIntegration: false,
@@ -43,7 +67,6 @@ function createWindow() {
     }
   })
 
-  // 开发模式检测
   const isDev = process.argv.includes('--dev') || !app.isPackaged
   
   if (isDev) {
@@ -88,46 +111,39 @@ ipcMain.handle('select-folder', async () => {
   return result.filePaths[0] || null
 })
 
-// 选择文件
+// 选择文件/文件夹
 ipcMain.handle('select-files', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
-    properties: ['openFile', 'multiSelections'],
-    title: '选择文件'
+    properties: ['openFile', 'multiSelections', 'openDirectory'],
+    title: '选择文件或文件夹'
   })
   return result.filePaths || []
 })
 
 // ========== 游戏项目管理 ==========
 
-// 获取所有游戏
-ipcMain.handle('get-games', async () => {
-  return await getGames()
-})
+ipcMain.handle('get-games', async () => await getGames())
 
-// 保存游戏列表
 ipcMain.handle('save-games', async (event, games) => {
   await saveGames(games)
   return true
 })
 
-// 添加游戏
 ipcMain.handle('add-game', async (event, game) => {
   const games = await getGames()
   game.id = crypto.randomUUID()
   game.createdAt = new Date().toISOString()
-  game.modHistory = []
-  game.directories = game.directories || []
+  game.mods = []
+  game.directories = []
   games.push(game)
   await saveGames(games)
   
-  // 为游戏创建备份目录
   const gameBackupPath = path.join(backupsPath, game.id)
   await fs.ensureDir(gameBackupPath)
   
   return game
 })
 
-// 更新游戏
 ipcMain.handle('update-game', async (event, updatedGame) => {
   const games = await getGames()
   const index = games.findIndex(g => g.id === updatedGame.id)
@@ -139,196 +155,15 @@ ipcMain.handle('update-game', async (event, updatedGame) => {
   return null
 })
 
-// 删除游戏
 ipcMain.handle('delete-game', async (event, gameId) => {
   const games = await getGames()
-  const filtered = games.filter(g => g.id !== gameId)
-  await saveGames(filtered)
-  
-  // 删除相关备份
-  const gameBackupPath = path.join(backupsPath, gameId)
-  await fs.remove(gameBackupPath)
-  
+  await saveGames(games.filter(g => g.id !== gameId))
+  await fs.remove(path.join(backupsPath, gameId))
   return true
 })
 
-// ========== Mod 操作 ==========
+// ========== 文件操作 ==========
 
-// 计算文件哈希
-async function calculateFileHash(filePath) {
-  const content = await fs.readFile(filePath)
-  return crypto.createHash('md5').update(content).digest('hex')
-}
-
-// 安装 Mod
-ipcMain.handle('install-mod', async (event, { gameId, sourceFiles, targetDir, targetDirName }) => {
-  const games = await getGames()
-  const gameIndex = games.findIndex(g => g.id === gameId)
-  if (gameIndex === -1) return { success: false, error: '游戏不存在' }
-
-  const game = games[gameIndex]
-  const gameBackupPath = path.join(backupsPath, gameId)
-  const modBackupPath = path.join(gameBackupPath, `mod_${Date.now()}`)
-  await fs.ensureDir(modBackupPath)
-
-  const installedFiles = []
-  const backupFiles = []
-  const errors = []
-
-  for (const sourceFile of sourceFiles) {
-    try {
-      const fileName = path.basename(sourceFile)
-      const destPath = path.join(targetDir, fileName)
-      const relativePath = path.relative(game.rootPath, destPath)
-      
-      // 检查目标是否已存在
-      let operationType = 'new'
-      let originalHash = null
-      
-      if (await fs.pathExists(destPath)) {
-        operationType = 'replace'
-        originalHash = await calculateFileHash(destPath)
-        
-        // 备份原文件
-        const backupFilePath = path.join(modBackupPath, 'originals', relativePath)
-        await fs.ensureDir(path.dirname(backupFilePath))
-        await fs.copy(destPath, backupFilePath)
-        backupFiles.push({
-          originalPath: destPath,
-          backupPath: backupFilePath,
-          relativePath: relativePath,
-          hash: originalHash
-        })
-      }
-
-      // 复制 mod 文件
-      await fs.copy(sourceFile, destPath, { overwrite: true })
-      
-      installedFiles.push({
-        sourceFile,
-        destPath,
-        relativePath,
-        operationType,
-        originalHash,
-        newHash: await calculateFileHash(destPath),
-        targetDirName
-      })
-    } catch (err) {
-      errors.push({ file: sourceFile, error: err.message })
-    }
-  }
-
-  // 记录操作历史
-  const historyEntry = {
-    id: crypto.randomUUID(),
-    timestamp: new Date().toISOString(),
-    operation: 'install',
-    targetDirName,
-    targetDir,
-    files: installedFiles,
-    backupFiles,
-    backupPath: modBackupPath
-  }
-
-  game.modHistory = game.modHistory || []
-  game.modHistory.push(historyEntry)
-  games[gameIndex] = game
-  await saveGames(games)
-
-  return {
-    success: true,
-    installedFiles,
-    backupFiles,
-    errors,
-    historyId: historyEntry.id
-  }
-})
-
-// 还原 Mod
-ipcMain.handle('restore-mod', async (event, { gameId, historyId }) => {
-  const games = await getGames()
-  const gameIndex = games.findIndex(g => g.id === gameId)
-  if (gameIndex === -1) return { success: false, error: '游戏不存在' }
-
-  const game = games[gameIndex]
-  const historyEntry = game.modHistory.find(h => h.id === historyId)
-  if (!historyEntry) return { success: false, error: '历史记录不存在' }
-
-  const errors = []
-
-  // 还原被替换的文件
-  for (const backupFile of historyEntry.backupFiles) {
-    try {
-      if (await fs.pathExists(backupFile.backupPath)) {
-        await fs.copy(backupFile.backupPath, backupFile.originalPath, { overwrite: true })
-      }
-    } catch (err) {
-      errors.push({ file: backupFile.originalPath, error: err.message })
-    }
-  }
-
-  // 删除新增的文件
-  for (const file of historyEntry.files) {
-    if (file.operationType === 'new') {
-      try {
-        await fs.remove(file.destPath)
-      } catch (err) {
-        errors.push({ file: file.destPath, error: err.message })
-      }
-    }
-  }
-
-  // 从历史中移除
-  games[gameIndex].modHistory = games[gameIndex].modHistory.filter(h => h.id !== historyId)
-  await saveGames(games)
-
-  // 删除备份目录
-  await fs.remove(historyEntry.backupPath)
-
-  return { success: true, errors }
-})
-
-// 批量还原
-ipcMain.handle('restore-all-mods', async (event, { gameId }) => {
-  const games = await getGames()
-  const gameIndex = games.findIndex(g => g.id === gameId)
-  if (gameIndex === -1) return { success: false, error: '游戏不存在' }
-
-  const game = games[gameIndex]
-  const results = []
-  
-  // 从最新的记录开始还原
-  const historyIds = [...game.modHistory].reverse().map(h => h.id)
-  
-  for (const historyId of historyIds) {
-    const result = await ipcMain.invoke('restore-mod', { gameId, historyId })
-    results.push({ historyId, ...result })
-  }
-
-  return { success: true, results }
-})
-
-// 删除 Mod 历史（不还原）
-ipcMain.handle('delete-mod-history', async (event, { gameId, historyId }) => {
-  const games = await getGames()
-  const gameIndex = games.findIndex(g => g.id === gameId)
-  if (gameIndex === -1) return { success: false, error: '游戏不存在' }
-
-  const game = games[gameIndex]
-  const historyEntry = game.modHistory.find(h => h.id === historyId)
-  if (!historyEntry) return { success: false, error: '历史记录不存在' }
-
-  // 删除备份文件
-  await fs.remove(historyEntry.backupPath)
-
-  // 从历史中移除
-  games[gameIndex].modHistory = games[gameIndex].modHistory.filter(h => h.id !== historyId)
-  await saveGames(games)
-
-  return { success: true }
-})
-
-// 获取目录下的文件列表
 ipcMain.handle('list-directory', async (event, dirPath) => {
   try {
     if (!await fs.pathExists(dirPath)) {
@@ -352,18 +187,13 @@ ipcMain.handle('list-directory', async (event, dirPath) => {
   }
 })
 
-// 打开目录
 ipcMain.handle('open-folder', async (event, folderPath) => {
   shell.openPath(folderPath)
   return true
 })
 
-// 检查路径是否存在
-ipcMain.handle('path-exists', async (event, filePath) => {
-  return fs.pathExists(filePath)
-})
+ipcMain.handle('path-exists', async (event, filePath) => fs.pathExists(filePath))
 
-// 获取文件信息
 ipcMain.handle('get-file-info', async (event, filePath) => {
   try {
     const stats = await fs.stat(filePath)
@@ -377,4 +207,225 @@ ipcMain.handle('get-file-info', async (event, filePath) => {
   } catch {
     return { exists: false }
   }
+})
+
+// ========== Mod 操作 ==========
+
+async function calculateFileHash(filePath) {
+  const content = await fs.readFile(filePath)
+  return crypto.createHash('md5').update(content).digest('hex')
+}
+
+// 安装 Mod
+ipcMain.handle('install-mod', async (event, { 
+  gameId, 
+  modName, 
+  modDescription, 
+  sourceItems,
+  targetDir 
+}) => {
+  const games = await getGames()
+  const gameIndex = games.findIndex(g => g.id === gameId)
+  if (gameIndex === -1) return { success: false, error: '游戏不存在' }
+
+  const game = games[gameIndex]
+  const modId = crypto.randomUUID()
+  const modBackupPath = path.join(backupsPath, gameId, modId)
+  await fs.ensureDir(modBackupPath)
+  await fs.ensureDir(path.join(modBackupPath, 'originals'))
+
+  const installedFiles = []
+  const backupFiles = []
+  const errors = []
+
+  // 收集所有文件
+  const allFiles = []
+  for (const itemPath of sourceItems) {
+    try {
+      const stats = await fs.stat(itemPath)
+      if (stats.isDirectory()) {
+        const files = await scanDirectory(itemPath)
+        allFiles.push(...files)
+      } else {
+        allFiles.push({
+          path: itemPath,
+          relativePath: path.basename(itemPath),
+          size: stats.size
+        })
+      }
+    } catch (err) {
+      errors.push({ file: itemPath, error: err.message })
+    }
+  }
+
+  // 处理每个文件
+  for (const file of allFiles) {
+    try {
+      const destPath = path.join(targetDir, file.relativePath)
+      
+      let operationType = 'new'
+      let originalHash = null
+      
+      await fs.ensureDir(path.dirname(destPath))
+      
+      if (await fs.pathExists(destPath)) {
+        operationType = 'replace'
+        originalHash = await calculateFileHash(destPath)
+        
+        const backupFilePath = path.join(modBackupPath, 'originals', file.relativePath)
+        await fs.ensureDir(path.dirname(backupFilePath))
+        await fs.copy(destPath, backupFilePath)
+        backupFiles.push({
+          originalPath: destPath,
+          backupPath: backupFilePath,
+          relativePath: file.relativePath,
+          hash: originalHash
+        })
+      }
+
+      await fs.copy(file.path, destPath, { overwrite: true })
+      
+      installedFiles.push({
+        sourceFile: file.path,
+        destPath,
+        relativePath: file.relativePath,
+        operationType,
+        originalHash,
+        newHash: await calculateFileHash(destPath),
+        size: file.size
+      })
+    } catch (err) {
+      errors.push({ file: file.path, error: err.message })
+    }
+  }
+
+  // 创建 Mod 项
+  const modItem = {
+    id: modId,
+    name: modName || `Mod ${(game.mods?.length || 0) + 1}`,
+    description: modDescription || '',
+    createdAt: new Date().toISOString(),
+    targetDir,
+    files: installedFiles,
+    backupFiles,
+    backupPath: modBackupPath,
+    stats: {
+      total: installedFiles.length,
+      new: installedFiles.filter(f => f.operationType === 'new').length,
+      replaced: installedFiles.filter(f => f.operationType === 'replace').length
+    }
+  }
+
+  game.mods = game.mods || []
+  game.mods.push(modItem)
+  games[gameIndex] = game
+  await saveGames(games)
+
+  return { success: true, mod: modItem, errors }
+})
+
+// 还原 Mod
+ipcMain.handle('restore-mod', async (event, { gameId, modId }) => {
+  const games = await getGames()
+  const gameIndex = games.findIndex(g => g.id === gameId)
+  if (gameIndex === -1) return { success: false, error: '游戏不存在' }
+
+  const game = games[gameIndex]
+  const modIndex = game.mods?.findIndex(m => m.id === modId)
+  if (modIndex === -1) return { success: false, error: 'Mod不存在' }
+
+  const mod = game.mods[modIndex]
+  const errors = []
+
+  // 还原被替换的文件
+  for (const backupFile of mod.backupFiles || []) {
+    try {
+      if (await fs.pathExists(backupFile.backupPath)) {
+        await fs.copy(backupFile.backupPath, backupFile.originalPath, { overwrite: true })
+      }
+    } catch (err) {
+      errors.push({ file: backupFile.originalPath, error: err.message })
+    }
+  }
+
+  // 删除新增的文件
+  for (const file of mod.files || []) {
+    if (file.operationType === 'new') {
+      try {
+        await fs.remove(file.destPath)
+      } catch (err) {
+        errors.push({ file: file.destPath, error: err.message })
+      }
+    }
+  }
+
+  game.mods.splice(modIndex, 1)
+  games[gameIndex] = game
+  await saveGames(games)
+  await fs.remove(mod.backupPath)
+
+  return { success: true, errors }
+})
+
+// 还原所有 Mod
+ipcMain.handle('restore-all-mods', async (event, { gameId }) => {
+  const games = await getGames()
+  const gameIndex = games.findIndex(g => g.id === gameId)
+  if (gameIndex === -1) return { success: false, error: '游戏不存在' }
+
+  let game = games[gameIndex]
+  const errors = []
+  
+  // 从后往前还原
+  while (game.mods && game.mods.length > 0) {
+    const mod = game.mods[game.mods.length - 1]
+    
+    // 还原文件
+    for (const backupFile of mod.backupFiles || []) {
+      try {
+        if (await fs.pathExists(backupFile.backupPath)) {
+          await fs.copy(backupFile.backupPath, backupFile.originalPath, { overwrite: true })
+        }
+      } catch (err) {
+        errors.push({ file: backupFile.originalPath, error: err.message })
+      }
+    }
+    
+    // 删除新增文件
+    for (const file of mod.files || []) {
+      if (file.operationType === 'new') {
+        try {
+          await fs.remove(file.destPath)
+        } catch (err) {
+          errors.push({ file: file.destPath, error: err.message })
+        }
+      }
+    }
+    
+    await fs.remove(mod.backupPath)
+    game.mods.pop()
+  }
+  
+  games[gameIndex] = game
+  await saveGames(games)
+
+  return { success: true, errors }
+})
+
+// 删除 Mod 记录
+ipcMain.handle('delete-mod-history', async (event, { gameId, modId }) => {
+  const games = await getGames()
+  const gameIndex = games.findIndex(g => g.id === gameId)
+  if (gameIndex === -1) return { success: false, error: '游戏不存在' }
+
+  const game = games[gameIndex]
+  const modIndex = game.mods?.findIndex(m => m.id === modId)
+  if (modIndex === -1) return { success: false, error: 'Mod不存在' }
+
+  await fs.remove(game.mods[modIndex].backupPath)
+  game.mods.splice(modIndex, 1)
+  games[gameIndex] = game
+  await saveGames(games)
+
+  return { success: true }
 })

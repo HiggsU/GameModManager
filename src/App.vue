@@ -4,19 +4,28 @@
     <div class="title-bar">
       <div class="title-bar-drag">
         <div class="title-bar-logo">
-          <span class="logo-icon">🎮</span>
-          <span class="logo-text">Game Mod Manager</span>
+          <div class="logo-pixel">🎮</div>
+          <div class="logo-text">
+            <span class="logo-main">Game Mod Manager</span>
+            <span class="logo-sub">轻松管理你的游戏Mod</span>
+          </div>
         </div>
       </div>
       <div class="title-bar-controls">
-        <button class="title-bar-btn minimize" @click="minimizeWindow">
-          <svg viewBox="0 0 12 12"><rect y="5" width="12" height="2"/></svg>
+        <button class="title-btn minimize" @click="minimizeWindow" title="最小化">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 12h14"/>
+          </svg>
         </button>
-        <button class="title-bar-btn maximize" @click="maximizeWindow">
-          <svg viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+        <button class="title-btn maximize" @click="maximizeWindow" title="最大化">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="4" y="4" width="16" height="16" rx="2"/>
+          </svg>
         </button>
-        <button class="title-bar-btn close" @click="closeWindow">
-          <svg viewBox="0 0 12 12"><path d="M1 1l10 10M11 1l-10 10" stroke="currentColor" stroke-width="2"/></svg>
+        <button class="title-btn close" @click="closeWindow" title="关闭">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M6 6l12 12M6 18L18 6"/>
+          </svg>
         </button>
       </div>
     </div>
@@ -26,11 +35,17 @@
       <!-- 侧边栏 -->
       <aside class="sidebar">
         <div class="sidebar-header">
-          <h3>游戏列表</h3>
-          <button class="btn btn-primary btn-sm" @click="showAddGameModal = true">
-            <span>+</span> 添加游戏
+          <h3>
+            <span class="sidebar-icon">🎯</span>
+            游戏列表
+          </h3>
+          <button class="btn-add-game" @click="openAddGameModal">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M12 5v14M5 12h14"/>
+            </svg>
           </button>
         </div>
+        
         <div class="game-list">
           <div 
             v-for="game in games" 
@@ -39,19 +54,25 @@
             :class="{ selected: selectedGame?.id === game.id }"
             @click="selectGame(game)"
           >
-            <div class="game-icon">{{ getGameIcon(game.name) }}</div>
-            <div class="game-info">
-              <h4 class="game-name">{{ game.name }}</h4>
-              <p class="game-path">{{ truncatePath(game.rootPath) }}</p>
-              <div class="game-meta">
-                <span class="badge badge-count">{{ game.directories?.length || 0 }} 目录</span>
-                <span class="badge badge-count">{{ game.modHistory?.length || 0 }} Mod</span>
+            <div class="game-card-icon">{{ getGameIcon(game.name) }}</div>
+            <div class="game-card-info">
+              <h4 class="game-card-name">{{ game.name }}</h4>
+              <div class="game-card-stats">
+                <span class="stat-item">
+                  <span class="stat-icon">📦</span>
+                  {{ game.mods?.length || 0 }} Mod
+                </span>
               </div>
             </div>
+            <div class="game-card-indicator"></div>
           </div>
-          <div v-if="games.length === 0" class="empty-state">
-            <div class="empty-state-icon">🎮</div>
-            <p class="empty-state-text">还没有添加游戏<br>点击上方按钮开始</p>
+          
+          <div v-if="games.length === 0" class="empty-games">
+            <div class="empty-icon">🎮</div>
+            <p>还没有游戏</p>
+            <button class="btn btn-primary btn-sm" @click="openAddGameModal">
+              添加第一个游戏
+            </button>
           </div>
         </div>
       </aside>
@@ -60,212 +81,238 @@
       <main class="panel">
         <!-- 欢迎界面 -->
         <div v-if="!selectedGame" class="welcome-screen">
-          <div class="welcome-content">
-            <div class="welcome-icon">🎮</div>
-            <h1>Game Mod Manager</h1>
-            <p>轻松管理你的游戏 Mod，支持拖拽安装、一键还原</p>
+          <div class="welcome-content animate-slideUp">
+            <div class="welcome-hero">
+              <div class="welcome-icon">
+                <span class="icon-main">🎮</span>
+                <span class="icon-float">✨</span>
+              </div>
+              <h1>Game Mod Manager</h1>
+              <p class="welcome-tagline">简化游戏打 Mod 的操作，支持一键还原</p>
+            </div>
+            
             <div class="welcome-features">
-              <div class="feature">
-                <span class="feature-icon">📁</span>
-                <span>多游戏支持</span>
+              <div class="feature-card">
+                <div class="feature-icon">📁</div>
+                <div class="feature-text">
+                  <h4>多游戏支持</h4>
+                  <p>管理多个游戏的 Mod</p>
+                </div>
               </div>
-              <div class="feature">
-                <span class="feature-icon">🎯</span>
-                <span>拖拽安装</span>
+              <div class="feature-card">
+                <div class="feature-icon">🎯</div>
+                <div class="feature-text">
+                  <h4>拖拽安装</h4>
+                  <p>支持文件和文件夹</p>
+                </div>
               </div>
-              <div class="feature">
-                <span class="feature-icon">💾</span>
-                <span>自动备份</span>
+              <div class="feature-card">
+                <div class="feature-icon">💾</div>
+                <div class="feature-text">
+                  <h4>自动备份</h4>
+                  <p>安全可靠</p>
+                </div>
               </div>
-              <div class="feature">
-                <span class="feature-icon">↩️</span>
-                <span>一键还原</span>
+              <div class="feature-card">
+                <div class="feature-icon">↩️</div>
+                <div class="feature-text">
+                  <h4>一键还原</h4>
+                  <p>随时恢复</p>
+                </div>
               </div>
             </div>
+
+            <button class="btn btn-primary btn-lg" @click="openAddGameModal">
+              <span>🚀</span> 开始使用
+            </button>
           </div>
         </div>
 
         <!-- 游戏详情 -->
-        <div v-else class="game-detail">
-          <!-- 游戏头部信息 -->
+        <div v-else class="game-detail animate-fadeIn">
+          <!-- 游戏头部 -->
           <div class="game-header">
             <div class="game-header-left">
-              <span class="game-header-icon">{{ getGameIcon(selectedGame.name) }}</span>
-              <div>
+              <div class="game-avatar">{{ getGameIcon(selectedGame.name) }}</div>
+              <div class="game-header-info">
                 <h2>{{ selectedGame.name }}</h2>
-                <p class="game-path-full">{{ selectedGame.rootPath }}</p>
+                <p class="game-path" @click="openFolder(selectedGame.rootPath)">
+                  📂 {{ selectedGame.rootPath }}
+                </p>
               </div>
             </div>
             <div class="game-header-actions">
-              <button class="btn btn-secondary btn-sm" @click="openGameFolder">
-                <span>📂</span> 打开目录
+              <button class="btn btn-ghost btn-sm" @click="openFolder(selectedGame.rootPath)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                  <polyline points="15 3 21 3 21 9"/>
+                  <line x1="10" y1="14" x2="21" y2="3"/>
+                </svg>
+                打开目录
               </button>
-              <button class="btn btn-ghost btn-sm" @click="showEditGameModal = true">
-                <span>⚙️</span> 设置
+              <button class="btn btn-ghost btn-sm" @click="showSettings = true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+                设置
               </button>
               <button class="btn btn-danger btn-sm" @click="confirmDeleteGame">
-                <span>🗑️</span> 删除
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="3 6 5 6 21 6"/>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                </svg>
               </button>
             </div>
           </div>
 
-          <!-- 标签页 -->
-          <div class="tabs">
-            <button 
-              class="tab" 
-              :class="{ active: activeTab === 'mod' }" 
-              @click="activeTab = 'mod'"
-            >
-              <span>🎯</span> 安装 Mod
-            </button>
-            <button 
-              class="tab" 
-              :class="{ active: activeTab === 'history' }" 
-              @click="activeTab = 'history'"
-            >
-              <span>📜</span> 历史记录
-              <span v-if="selectedGame.modHistory?.length" class="badge badge-count">
-                {{ selectedGame.modHistory.length }}
-              </span>
-            </button>
-          </div>
-
-          <!-- Mod 安装面板 -->
-          <div v-show="activeTab === 'mod'" class="tab-content">
-            <!-- 目标目录选择 -->
-            <div class="section">
-              <h3 class="section-title">
-                <span>📂</span> 目标目录
+          <!-- 目标目录选择 -->
+          <div class="target-section">
+            <div class="target-header">
+              <h3>
+                <span class="section-icon">📁</span>
+                目标目录
               </h3>
-              <div class="directory-list">
-                <div 
-                  v-for="dir in selectedGame.directories" 
-                  :key="dir.path"
-                  class="directory-item"
-                  :class="{ selected: selectedDirectory === dir.path }"
-                  @click="selectedDirectory = dir.path"
-                >
-                  <span class="dir-icon">📁</span>
-                  <div class="dir-info">
-                    <span class="dir-name">{{ dir.name }}</span>
-                    <span class="dir-path">{{ truncatePath(dir.path) }}</span>
-                  </div>
-                  <span v-if="selectedDirectory === dir.path" class="check-icon">✓</span>
-                </div>
-              </div>
-              <button class="btn btn-secondary btn-sm mt-4" @click="showAddDirModal = true">
-                <span>+</span> 添加目录
+              <button class="btn btn-secondary btn-sm" @click="showAddDirModal = true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 5v14M5 12h14"/>
+                </svg>
+                添加目录
               </button>
             </div>
-
-            <!-- 拖拽区域 -->
-            <div class="section">
-              <h3 class="section-title">
-                <span>🎯</span> 添加 Mod 文件
-              </h3>
+            
+            <div class="target-list">
+              <!-- 默认游戏根目录 -->
               <div 
-                class="drop-zone"
-                :class="{ active: isDragging }"
-                @dragover.prevent="isDragging = true"
-                @dragleave="isDragging = false"
-                @drop.prevent="handleDrop"
-                @click="selectFiles"
+                class="target-item"
+                :class="{ selected: targetDirectory === selectedGame.rootPath }"
+                @click="targetDirectory = selectedGame.rootPath"
               >
-                <div class="drop-zone-icon">📥</div>
-                <div class="drop-zone-title">
-                  {{ isDragging ? '松开放入 Mod 文件' : '拖拽文件到此处' }}
+                <div class="target-icon">🏠</div>
+                <div class="target-info">
+                  <span class="target-name">游戏根目录</span>
+                  <span class="target-path">{{ selectedGame.rootPath }}</span>
                 </div>
-                <div class="drop-zone-text">或点击选择文件</div>
+                <div v-if="targetDirectory === selectedGame.rootPath" class="target-check">✓</div>
               </div>
-
-              <!-- 待安装文件列表 -->
-              <div v-if="pendingFiles.length > 0" class="pending-files mt-4">
-                <div class="pending-header">
-                  <h4>待安装文件 ({{ pendingFiles.length }})</h4>
-                  <button class="btn btn-ghost btn-sm" @click="clearPendingFiles">清空</button>
+              
+              <!-- 自定义目录 -->
+              <div 
+                v-for="dir in selectedGame.directories" 
+                :key="dir.path"
+                class="target-item"
+                :class="{ selected: targetDirectory === dir.path }"
+                @click="targetDirectory = dir.path"
+              >
+                <div class="target-icon">📂</div>
+                <div class="target-info">
+                  <span class="target-name">{{ dir.name }}</span>
+                  <span class="target-path">{{ dir.path }}</span>
                 </div>
-                <div class="file-list">
-                  <div v-for="file in pendingFiles" :key="file.path" class="file-item">
-                    <span class="file-icon">{{ getFileIcon(file.name) }}</span>
-                    <span class="file-name">{{ file.name }}</span>
-                    <span class="file-size">{{ formatFileSize(file.size) }}</span>
-                    <button class="btn btn-icon btn-ghost btn-sm" @click="removePendingFile(file)">
-                      ×
-                    </button>
-                  </div>
-                </div>
-                <div class="pending-actions mt-4">
-                  <button 
-                    class="btn btn-success" 
-                    :disabled="!selectedDirectory || pendingFiles.length === 0"
-                    @click="installMods"
-                  >
-                    <span>✨</span> 安装 Mod
-                  </button>
-                </div>
+                <div v-if="targetDirectory === dir.path" class="target-check">✓</div>
+                <button class="target-remove" @click.stop="removeDirectory(dir.path)">×</button>
               </div>
             </div>
           </div>
 
-          <!-- 历史记录面板 -->
-          <div v-show="activeTab === 'history'" class="tab-content">
-            <div class="section">
-              <div class="section-header">
-                <h3 class="section-title">
-                  <span>📜</span> 操作历史
-                </h3>
-                <button 
-                  v-if="selectedGame.modHistory?.length > 0"
-                  class="btn btn-warning btn-sm"
-                  @click="restoreAllMods"
-                >
-                  <span>↩️</span> 一键还原全部
-                </button>
+          <!-- 拖拽区域 -->
+          <div 
+            class="drop-zone"
+            :class="{ active: isDragging }"
+            @dragover.prevent="isDragging = true"
+            @dragleave="isDragging = false"
+            @drop.prevent="handleDrop"
+            @click="selectFiles"
+          >
+            <div class="drop-content">
+              <div class="drop-icon">
+                <span v-if="!isDragging">📥</span>
+                <span v-else class="bounce">🎯</span>
               </div>
-
-              <div v-if="!selectedGame.modHistory?.length" class="empty-state">
-                <div class="empty-state-icon">📜</div>
-                <p class="empty-state-text">暂无操作记录</p>
+              <div class="drop-text">
+                <h3>{{ isDragging ? '松开添加 Mod' : '拖拽 Mod 文件到这里' }}</h3>
+                <p>支持文件、文件夹或混合拖拽</p>
               </div>
+              <button class="btn btn-secondary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                或点击选择
+              </button>
+            </div>
+          </div>
 
-              <div v-else class="history-list">
-                <div 
-                  v-for="history in [...selectedGame.modHistory].reverse()" 
-                  :key="history.id"
-                  class="history-item"
-                >
-                  <div class="history-icon">🎮</div>
-                  <div class="history-content">
-                    <div class="history-title">
-                      Mod 安装 - {{ history.targetDirName }}
-                    </div>
-                    <div class="history-meta">
-                      <span>📅 {{ formatDate(history.timestamp) }}</span>
-                      <span>📁 {{ history.files.length }} 个文件</span>
-                      <span class="badge badge-new">{{ history.files.filter(f => f.operationType === 'new').length }} 新增</span>
-                      <span class="badge badge-replace">{{ history.files.filter(f => f.operationType === 'replace').length }} 替换</span>
-                    </div>
-                    <div class="history-files mt-2">
-                      <span 
-                        v-for="file in history.files.slice(0, 5)" 
-                        :key="file.destPath"
-                        class="file-tag"
-                      >
-                        {{ file.operationType === 'replace' ? '🔄' : '✨' }} {{ file.relativePath.split(/[\\/]/).pop() }}
-                      </span>
-                      <span v-if="history.files.length > 5" class="more-tag">
-                        +{{ history.files.length - 5 }} 更多...
-                      </span>
-                    </div>
+          <!-- Mod 列表 -->
+          <div class="mod-section">
+            <div class="mod-header">
+              <h3>
+                <span class="section-icon">📦</span>
+                已安装 Mod
+                <span class="mod-count">{{ selectedGame.mods?.length || 0 }}</span>
+              </h3>
+              <button 
+                v-if="selectedGame.mods?.length > 0"
+                class="btn btn-warning btn-sm"
+                @click="restoreAllMods"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="1 4 1 10 7 10"/>
+                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+                </svg>
+                一键还原全部
+              </button>
+            </div>
+
+            <div v-if="!selectedGame.mods?.length" class="empty-mods">
+              <div class="empty-icon">📦</div>
+              <p>还没有安装任何 Mod</p>
+              <span>拖拽文件到上方区域开始安装</span>
+            </div>
+
+            <div v-else class="mod-list">
+              <div 
+                v-for="mod in [...selectedGame.mods].reverse()" 
+                :key="mod.id"
+                class="mod-card"
+              >
+                <div class="mod-icon">{{ getModIcon(mod.name) }}</div>
+                <div class="mod-info">
+                  <div class="mod-title">
+                    <h4>{{ mod.name }}</h4>
+                    <span class="mod-date">{{ formatDate(mod.createdAt) }}</span>
                   </div>
-                  <div class="history-actions">
-                    <button class="btn btn-warning btn-sm" @click="restoreMod(history.id)">
-                      <span>↩️</span> 还原
-                    </button>
-                    <button class="btn btn-danger btn-sm" @click="deleteHistory(history.id)">
-                      <span>🗑️</span> 删除
-                    </button>
+                  <p v-if="mod.description" class="mod-desc">{{ mod.description }}</p>
+                  <div class="mod-stats">
+                    <span class="stat">
+                      <span class="stat-dot new"></span>
+                      {{ mod.stats?.new || 0 }} 新增
+                    </span>
+                    <span class="stat">
+                      <span class="stat-dot replace"></span>
+                      {{ mod.stats?.replaced || 0 }} 替换
+                    </span>
+                    <span class="stat-total">共 {{ mod.stats?.total || 0 }} 文件</span>
                   </div>
+                </div>
+                <div class="mod-actions">
+                  <button class="btn btn-ghost btn-sm" @click="showModFiles(mod)" title="查看文件">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                      <polyline points="14 2 14 8 20 8"/>
+                      <line x1="16" y1="13" x2="8" y2="13"/>
+                      <line x1="16" y1="17" x2="8" y2="17"/>
+                      <polyline points="10 9 9 9 8 9"/>
+                    </svg>
+                  </button>
+                  <button class="btn btn-warning btn-sm" @click="restoreMod(mod.id)" title="还原">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="1 4 1 10 7 10"/>
+                      <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+                    </svg>
+                    还原
+                  </button>
                 </div>
               </div>
             </div>
@@ -275,11 +322,14 @@
     </div>
 
     <!-- 添加游戏弹窗 -->
-    <div v-if="showAddGameModal" class="modal-overlay" @click.self="showAddGameModal = false">
-      <div class="modal">
+    <div v-if="showAddGameModal" class="modal-overlay" @click.self="closeAddGameModal">
+      <div class="modal animate-scaleIn">
         <div class="modal-header">
-          <h3 class="modal-title">🎮 添加新游戏</h3>
-          <button class="btn btn-icon btn-ghost" @click="showAddGameModal = false">×</button>
+          <h3>
+            <span class="modal-icon">🎮</span>
+            添加新游戏
+          </h3>
+          <button class="btn-close" @click="closeAddGameModal">×</button>
         </div>
         <div class="modal-body">
           <div class="form-group">
@@ -288,89 +338,69 @@
               v-model="newGame.name" 
               type="text" 
               class="form-input" 
-              placeholder="输入游戏名称，如：GTA V"
+              placeholder="例如：GTA V、Minecraft、Cyberpunk 2077"
+              @keyup.enter="addGame"
             >
           </div>
           <div class="form-group">
             <label class="form-label">游戏根目录</label>
-            <div class="form-input-with-btn">
+            <div class="input-group">
               <input 
                 v-model="newGame.rootPath" 
                 type="text" 
                 class="form-input" 
-                placeholder="选择游戏安装目录"
+                placeholder="游戏安装目录"
                 readonly
               >
-              <button class="btn btn-secondary" @click="selectGameRootPath">浏览...</button>
+              <button class="btn btn-secondary" @click="selectGameRootPath">浏览</button>
             </div>
           </div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" @click="showAddGameModal = false">取消</button>
-          <button class="btn btn-primary" @click="addGame" :disabled="!newGame.name || !newGame.rootPath">
-            添加游戏
+          <button class="btn btn-secondary" @click="closeAddGameModal">取消</button>
+          <button 
+            class="btn btn-primary" 
+            @click="addGame"
+            :disabled="!newGame.name || !newGame.rootPath"
+          >
+            <span>✨</span> 添加游戏
           </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 编辑游戏弹窗 -->
-    <div v-if="showEditGameModal" class="modal-overlay" @click.self="showEditGameModal = false">
-      <div class="modal">
-        <div class="modal-header">
-          <h3 class="modal-title">⚙️ 游戏设置</h3>
-          <button class="btn btn-icon btn-ghost" @click="showEditGameModal = false">×</button>
-        </div>
-        <div class="modal-body">
-          <div class="form-group">
-            <label class="form-label">游戏名称</label>
-            <input v-model="editGameData.name" type="text" class="form-input">
-          </div>
-          <div class="form-group">
-            <label class="form-label">游戏根目录</label>
-            <div class="form-input-with-btn">
-              <input v-model="editGameData.rootPath" type="text" class="form-input" readonly>
-              <button class="btn btn-secondary" @click="selectEditRootPath">浏览...</button>
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-secondary" @click="showEditGameModal = false">取消</button>
-          <button class="btn btn-primary" @click="updateGame">保存更改</button>
         </div>
       </div>
     </div>
 
     <!-- 添加目录弹窗 -->
     <div v-if="showAddDirModal" class="modal-overlay" @click.self="showAddDirModal = false">
-      <div class="modal">
+      <div class="modal animate-scaleIn">
         <div class="modal-header">
-          <h3 class="modal-title">📁 添加目标目录</h3>
-          <button class="btn btn-icon btn-ghost" @click="showAddDirModal = false">×</button>
+          <h3>
+            <span class="modal-icon">📁</span>
+            添加目标目录
+          </h3>
+          <button class="btn-close" @click="showAddDirModal = false">×</button>
         </div>
         <div class="modal-body">
           <div class="form-group">
             <label class="form-label">目录名称</label>
             <input 
-              v-model="newDirectory.name" 
+              v-model="newDir.name" 
               type="text" 
               class="form-input" 
-              placeholder="如：Mods、Plugins、Mods文件夹"
+              placeholder="例如：Mods、Plugins、Data"
             >
           </div>
           <div class="form-group">
             <label class="form-label">目录路径</label>
-            <div class="form-input-with-btn">
+            <div class="input-group">
               <input 
-                v-model="newDirectory.path" 
+                v-model="newDir.path" 
                 type="text" 
                 class="form-input" 
                 placeholder="Mod 文件要放入的目标目录"
                 readonly
               >
-              <button class="btn btn-secondary" @click="selectDirectoryPath">浏览...</button>
+              <button class="btn btn-secondary" @click="selectDirPath">浏览</button>
             </div>
-            <p class="hint mt-2">相对于游戏根目录的完整路径</p>
           </div>
         </div>
         <div class="modal-footer">
@@ -378,29 +408,130 @@
           <button 
             class="btn btn-primary" 
             @click="addDirectory"
-            :disabled="!newDirectory.name || !newDirectory.path"
+            :disabled="!newDir.name || !newDir.path"
           >
-            添加目录
+            <span>📁</span> 添加目录
           </button>
         </div>
       </div>
     </div>
 
-    <!-- 安装进度弹窗 -->
+    <!-- 安装 Mod 弹窗 -->
     <div v-if="showInstallModal" class="modal-overlay">
-      <div class="modal">
+      <div class="modal animate-scaleIn">
         <div class="modal-header">
-          <h3 class="modal-title">✨ 安装 Mod</h3>
+          <h3>
+            <span class="modal-icon">✨</span>
+            安装 Mod
+          </h3>
         </div>
         <div class="modal-body">
-          <div class="install-progress">
-            <div class="progress-text">{{ installStatus }}</div>
-            <div class="progress-bar">
-              <div class="progress-fill" :style="{ width: installProgress + '%' }"></div>
+          <div class="form-group">
+            <label class="form-label">Mod 名称</label>
+            <input 
+              v-model="installModName" 
+              type="text" 
+              class="form-input" 
+              placeholder="给这个 Mod 起个名字"
+            >
+          </div>
+          <div class="form-group">
+            <label class="form-label">描述（可选）</label>
+            <input 
+              v-model="installModDesc" 
+              type="text" 
+              class="form-input" 
+              placeholder="简要描述这个 Mod"
+            >
+          </div>
+          <div class="install-files">
+            <div class="files-header">
+              <span>待安装文件 ({{ pendingFiles.length }})</span>
+              <button class="btn btn-ghost btn-sm" @click="clearPendingFiles">清空</button>
+            </div>
+            <div class="files-list">
+              <div v-for="file in pendingFiles.slice(0, 5)" :key="file.path" class="file-item">
+                <span class="file-icon">{{ getFileIcon(file.name) }}</span>
+                <span class="file-name">{{ file.name }}</span>
+                <span class="file-size">{{ formatSize(file.size) }}</span>
+              </div>
+              <div v-if="pendingFiles.length > 5" class="file-more">
+                还有 {{ pendingFiles.length - 5 }} 个文件...
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" @click="cancelInstall">取消</button>
+          <button 
+            class="btn btn-success" 
+            @click="confirmInstall"
+            :disabled="pendingFiles.length === 0"
+          >
+            <span>🚀</span> 安装
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mod 文件详情弹窗 -->
+    <div v-if="showFilesModal" class="modal-overlay" @click.self="showFilesModal = false">
+      <div class="modal modal-lg animate-scaleIn">
+        <div class="modal-header">
+          <h3>
+            <span class="modal-icon">📄</span>
+            {{ selectedMod?.name }} - 文件列表
+          </h3>
+          <button class="btn-close" @click="showFilesModal = false">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="file-detail-list">
+            <div v-for="file in selectedMod?.files" :key="file.destPath" class="file-detail-item">
+              <span class="file-type" :class="file.operationType">
+                {{ file.operationType === 'replace' ? '🔄' : '✨' }}
+              </span>
+              <span class="file-path">{{ file.relativePath }}</span>
+              <span class="file-size">{{ formatSize(file.size) }}</span>
             </div>
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- 设置弹窗 -->
+    <div v-if="showSettings" class="modal-overlay" @click.self="showSettings = false">
+      <div class="modal animate-scaleIn">
+        <div class="modal-header">
+          <h3>
+            <span class="modal-icon">⚙️</span>
+            游戏设置
+          </h3>
+          <button class="btn-close" @click="showSettings = false">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">游戏名称</label>
+            <input v-model="editGameName" type="text" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label">游戏根目录</label>
+            <div class="input-group">
+              <input v-model="editGamePath" type="text" class="form-input" readonly>
+              <button class="btn btn-secondary" @click="selectEditPath">浏览</button>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" @click="showSettings = false">取消</button>
+          <button class="btn btn-primary" @click="updateGame">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast 提示 -->
+    <div v-if="toast.show" class="toast" :class="toast.type">
+      <span class="toast-icon">{{ toast.type === 'success' ? '✅' : '❌' }}</span>
+      {{ toast.message }}
     </div>
   </div>
 </template>
@@ -414,299 +545,60 @@ export default {
     // 状态
     const games = ref([])
     const selectedGame = ref(null)
-    const activeTab = ref('mod')
-    const selectedDirectory = ref('')
+    const targetDirectory = ref('')
     
     // 弹窗状态
     const showAddGameModal = ref(false)
-    const showEditGameModal = ref(false)
     const showAddDirModal = ref(false)
     const showInstallModal = ref(false)
+    const showFilesModal = ref(false)
+    const showSettings = ref(false)
     
-    // 拖拽状态
+    // 拖拽
     const isDragging = ref(false)
     
     // 待安装文件
     const pendingFiles = ref([])
+    const installModName = ref('')
+    const installModDesc = ref('')
     
-    // 安装状态
-    const installStatus = ref('')
-    const installProgress = ref(0)
+    // 选中的 Mod
+    const selectedMod = ref(null)
     
-    // 新游戏表单
-    const newGame = reactive({
-      name: '',
-      rootPath: ''
-    })
+    // 编辑
+    const editGameName = ref('')
+    const editGamePath = ref('')
     
-    // 编辑游戏数据
-    const editGameData = reactive({
-      name: '',
-      rootPath: ''
-    })
-    
-    // 新目录表单
-    const newDirectory = reactive({
-      name: '',
-      path: ''
+    // Toast
+    const toast = reactive({
+      show: false,
+      message: '',
+      type: 'success'
     })
 
-    // 加载游戏列表
-    const loadGames = async () => {
-      try {
-        const result = await window.electronAPI.getGames()
-        games.value = result || []
-      } catch (e) {
-        console.error('加载游戏列表失败:', e)
-        games.value = []
-      }
-    }
-
-    // 选择游戏
-    const selectGame = (game) => {
-      selectedGame.value = game
-      if (game.directories?.length > 0) {
-        selectedDirectory.value = game.directories[0].path
-      } else {
-        selectedDirectory.value = ''
-      }
-    }
-
-    // 窗口控制
-    const minimizeWindow = () => window.electronAPI.minimize()
-    const maximizeWindow = () => window.electronAPI.maximize()
-    const closeWindow = () => window.electronAPI.close()
-
-    // 选择游戏根目录
-    const selectGameRootPath = async () => {
-      const path = await window.electronAPI.selectFolder()
-      if (path) {
-        newGame.rootPath = path
-      }
-    }
-
-    // 添加游戏
-    const addGame = async () => {
-      if (!newGame.name || !newGame.rootPath) return
-      
-      const game = {
-        name: newGame.name,
-        rootPath: newGame.rootPath,
-        directories: []
-      }
-      
-      const added = await window.electronAPI.addGame(game)
-      games.value.push(added)
-      
-      // 重置表单
-      newGame.name = ''
-      newGame.rootPath = ''
-      showAddGameModal.value = false
-      
-      // 选中新添加的游戏
-      selectGame(added)
-    }
-
-    // 编辑游戏
-    const selectEditRootPath = async () => {
-      const path = await window.electronAPI.selectFolder()
-      if (path) {
-        editGameData.rootPath = path
-      }
-    }
-
-    const updateGame = async () => {
-      const index = games.value.findIndex(g => g.id === selectedGame.value.id)
-      if (index !== -1) {
-        games.value[index] = { 
-          ...games.value[index], 
-          name: editGameData.name,
-          rootPath: editGameData.rootPath
-        }
-        await window.electronAPI.saveGames(games.value)
-        selectedGame.value = games.value[index]
-      }
-      showEditGameModal.value = false
-    }
-
-    // 打开游戏目录
-    const openGameFolder = () => {
-      if (selectedGame.value?.rootPath) {
-        window.electronAPI.openFolder(selectedGame.value.rootPath)
-      }
-    }
-
-    // 删除游戏
-    const confirmDeleteGame = async () => {
-      if (confirm(`确定要删除游戏 "${selectedGame.value.name}" 吗？\n这将删除所有相关的备份文件。`)) {
-        await window.electronAPI.deleteGame(selectedGame.value.id)
-        games.value = games.value.filter(g => g.id !== selectedGame.value.id)
-        selectedGame.value = null
-      }
-    }
-
-    // 添加目录
-    const selectDirectoryPath = async () => {
-      const path = await window.electronAPI.selectFolder()
-      if (path) {
-        newDirectory.path = path
-      }
-    }
-
-    const addDirectory = async () => {
-      if (!newDirectory.name || !newDirectory.path) return
-      
-      const index = games.value.findIndex(g => g.id === selectedGame.value.id)
-      if (index !== -1) {
-        games.value[index].directories = games.value[index].directories || []
-        games.value[index].directories.push({
-          name: newDirectory.name,
-          path: newDirectory.path
-        })
-        await window.electronAPI.saveGames(games.value)
-        selectedGame.value = games.value[index]
-        selectedDirectory.value = newDirectory.path
-      }
-      
-      // 重置表单
-      newDirectory.name = ''
-      newDirectory.path = ''
-      showAddDirModal.value = false
-    }
-
-    // 文件拖放处理
-    const handleDrop = async (e) => {
-      isDragging.value = false
-      const files = e.dataTransfer.files
-      await processFiles(files)
-    }
-
-    // 选择文件
-    const selectFiles = async () => {
-      const files = await window.electronAPI.selectFiles()
-      if (files?.length > 0) {
-        for (const filePath of files) {
-          const info = await window.electronAPI.getFileInfo(filePath)
-          if (!info.isDirectory && !pendingFiles.value.some(f => f.path === filePath)) {
-            pendingFiles.value.push({
-              path: filePath,
-              name: filePath.split(/[\\/]/).pop(),
-              size: info.size
-            })
-          }
-        }
-      }
-    }
-
-    // 处理文件
-    const processFiles = async (fileList) => {
-      for (const file of fileList) {
-        const filePath = file.path
-        const info = await window.electronAPI.getFileInfo(filePath)
-        if (!info.isDirectory && !pendingFiles.value.some(f => f.path === filePath)) {
-          pendingFiles.value.push({
-            path: filePath,
-            name: file.name,
-            size: file.size
-          })
-        }
-      }
-    }
-
-    // 清空待安装文件
-    const clearPendingFiles = () => {
-      pendingFiles.value = []
-    }
-
-    // 移除单个文件
-    const removePendingFile = (file) => {
-      pendingFiles.value = pendingFiles.value.filter(f => f.path !== file.path)
-    }
-
-    // 安装 Mod
-    const installMods = async () => {
-      if (!selectedDirectory.value || pendingFiles.value.length === 0) return
-      
-      showInstallModal.value = true
-      installProgress.value = 0
-      installStatus.value = '正在准备安装...'
-      
-      const dirName = selectedGame.value.directories.find(d => d.path === selectedDirectory.value)?.name || '未知目录'
-      
-      try {
-        installStatus.value = '正在复制文件...'
-        installProgress.value = 30
-        
-        const result = await window.electronAPI.installMod({
-          gameId: selectedGame.value.id,
-          sourceFiles: pendingFiles.value.map(f => f.path),
-          targetDir: selectedDirectory.value,
-          targetDirName: dirName
-        })
-        
-        installProgress.value = 100
-        installStatus.value = '安装完成！'
-        
-        // 更新游戏数据
-        await loadGames()
-        selectedGame.value = games.value.find(g => g.id === selectedGame.value.id)
-        
-        // 清空待安装文件
-        pendingFiles.value = []
-        
-        // 切换到历史记录
-        activeTab.value = 'history'
-        
-        setTimeout(() => {
-          showInstallModal.value = false
-        }, 1000)
-        
-      } catch (e) {
-        installStatus.value = '安装失败: ' + e.message
-        setTimeout(() => {
-          showInstallModal.value = false
-        }, 2000)
-      }
-    }
-
-    // 还原 Mod
-    const restoreMod = async (historyId) => {
-      if (confirm('确定要还原这个 Mod 吗？\n这将恢复被替换的文件并删除新增的文件。')) {
-        await window.electronAPI.restoreMod({
-          gameId: selectedGame.value.id,
-          historyId: historyId
-        })
-        await loadGames()
-        selectedGame.value = games.value.find(g => g.id === selectedGame.value.id)
-      }
-    }
-
-    // 一键还原所有
-    const restoreAllMods = async () => {
-      if (confirm('确定要还原所有 Mod 吗？\n这将恢复游戏到安装 Mod 之前的状态。')) {
-        await window.electronAPI.restoreAllMods({
-          gameId: selectedGame.value.id
-        })
-        await loadGames()
-        selectedGame.value = games.value.find(g => g.id === selectedGame.value.id)
-      }
-    }
-
-    // 删除历史记录
-    const deleteHistory = async (historyId) => {
-      if (confirm('确定要删除这条历史记录吗？\n注意：这不会还原已安装的 Mod。')) {
-        await window.electronAPI.deleteModHistory({
-          gameId: selectedGame.value.id,
-          historyId: historyId
-        })
-        await loadGames()
-        selectedGame.value = games.value.find(g => g.id === selectedGame.value.id)
-      }
-    }
+    // 表单
+    const newGame = reactive({ name: '', rootPath: '' })
+    const newDir = reactive({ name: '', path: '' })
 
     // 工具函数
+    const showToast = (message, type = 'success') => {
+      toast.message = message
+      toast.type = type
+      toast.show = true
+      setTimeout(() => toast.show = false, 3000)
+    }
+
     const getGameIcon = (name) => {
-      const icons = ['🎮', '🎯', '🎲', '🎰', '🕹️', '🖥️', '👾', '🏆']
+      const icons = ['🎮', '🎯', '🎲', '🎰', '🕹️', '🖥️', '👾', '🏆', '🎪', '🎨']
+      let hash = 0
+      for (let i = 0; i < name.length; i++) {
+        hash = name.charCodeAt(i) + ((hash << 5) - hash)
+      }
+      return icons[Math.abs(hash) % icons.length]
+    }
+
+    const getModIcon = (name) => {
+      const icons = ['📦', '🎁', '🧩', '🔧', '⚡', '🔥', '💎', '🌟']
       let hash = 0
       for (let i = 0; i < name.length; i++) {
         hash = name.charCodeAt(i) + ((hash << 5) - hash)
@@ -716,105 +608,326 @@ export default {
 
     const getFileIcon = (name) => {
       const ext = name.split('.').pop()?.toLowerCase()
-      const iconMap = {
-        'dll': '📦',
-        'exe': '⚙️',
-        'zip': '🗜️',
-        'rar': '🗜️',
-        '7z': '🗜️',
-        'pak': '📦',
-        'asi': '📜',
-        'lua': '📜',
-        'txt': '📄',
-        'json': '📋',
-        'xml': '📋',
-        'ini': '⚙️',
-        'cfg': '⚙️'
-      }
-      return iconMap[ext] || '📄'
+      const map = { dll: '📦', exe: '⚙️', zip: '🗜️', rar: '🗜️', pak: '📦', asi: '📜', lua: '📜' }
+      return map[ext] || '📄'
     }
 
-    const truncatePath = (path, maxLen = 30) => {
-      if (!path) return ''
-      if (path.length <= maxLen) return path
-      return '...' + path.slice(-maxLen)
-    }
-
-    const formatFileSize = (bytes) => {
-      if (bytes === 0) return '0 B'
+    const formatSize = (bytes) => {
+      if (!bytes) return '0 B'
       const k = 1024
       const sizes = ['B', 'KB', 'MB', 'GB']
       const i = Math.floor(Math.log(bytes) / Math.log(k))
-      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
     }
 
-    const formatDate = (isoString) => {
-      const date = new Date(isoString)
-      return date.toLocaleString('zh-CN', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
+    const formatDate = (str) => {
+      if (!str) return ''
+      const d = new Date(str)
+      return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`
+    }
+
+    // 窗口控制
+    const minimizeWindow = () => window.electronAPI.minimize()
+    const maximizeWindow = () => window.electronAPI.maximize()
+    const closeWindow = () => window.electronAPI.close()
+
+    // 加载游戏
+    const loadGames = async () => {
+      try {
+        games.value = await window.electronAPI.getGames() || []
+      } catch (e) {
+        console.error(e)
+      }
+    }
+
+    // 选择游戏
+    const selectGame = (game) => {
+      selectedGame.value = game
+      targetDirectory.value = game.rootPath
+    }
+
+    // 打开文件夹
+    const openFolder = (path) => {
+      window.electronAPI.openFolder(path)
+    }
+
+    // 添加游戏
+    const openAddGameModal = () => {
+      newGame.name = ''
+      newGame.rootPath = ''
+      showAddGameModal.value = true
+    }
+
+    const closeAddGameModal = () => {
+      showAddGameModal.value = false
+    }
+
+    const selectGameRootPath = async () => {
+      const path = await window.electronAPI.selectFolder()
+      if (path) newGame.rootPath = path
+    }
+
+    const addGame = async () => {
+      if (!newGame.name || !newGame.rootPath) return
+      
+      const game = await window.electronAPI.addGame({
+        name: newGame.name,
+        rootPath: newGame.rootPath
       })
+      
+      games.value.push(game)
+      selectGame(game)
+      closeAddGameModal()
+      showToast(`游戏 "${game.name}" 添加成功！`)
     }
 
-    // 监听编辑弹窗打开
-    watch(showEditGameModal, (val) => {
+    // 删除游戏
+    const confirmDeleteGame = async () => {
+      if (!confirm(`确定要删除 "${selectedGame.value.name}"？\n这将删除所有 Mod 备份。`)) return
+      
+      await window.electronAPI.deleteGame(selectedGame.value.id)
+      games.value = games.value.filter(g => g.id !== selectedGame.value.id)
+      selectedGame.value = null
+      showToast('游戏已删除')
+    }
+
+    // 设置
+    const selectEditPath = async () => {
+      const path = await window.electronAPI.selectFolder()
+      if (path) editGamePath.value = path
+    }
+
+    const updateGame = async () => {
+      const idx = games.value.findIndex(g => g.id === selectedGame.value.id)
+      if (idx === -1) return
+      
+      games.value[idx].name = editGameName.value
+      games.value[idx].rootPath = editGamePath.value
+      
+      await window.electronAPI.saveGames(games.value)
+      selectedGame.value = games.value[idx]
+      targetDirectory.value = editGamePath.value
+      showSettings.value = false
+      showToast('设置已保存')
+    }
+
+    // 添加目录
+    const selectDirPath = async () => {
+      const path = await window.electronAPI.selectFolder()
+      if (path) newDir.path = path
+    }
+
+    const addDirectory = async () => {
+      if (!newDir.name || !newDir.path) return
+      
+      const idx = games.value.findIndex(g => g.id === selectedGame.value.id)
+      if (idx === -1) return
+      
+      games.value[idx].directories = games.value[idx].directories || []
+      games.value[idx].directories.push({ name: newDir.name, path: newDir.path })
+      
+      await window.electronAPI.saveGames(games.value)
+      selectedGame.value = games.value[idx]
+      targetDirectory.value = newDir.path
+      
+      newDir.name = ''
+      newDir.path = ''
+      showAddDirModal.value = false
+      showToast('目录已添加')
+    }
+
+    const removeDirectory = async (path) => {
+      const idx = games.value.findIndex(g => g.id === selectedGame.value.id)
+      if (idx === -1) return
+      
+      games.value[idx].directories = games.value[idx].directories.filter(d => d.path !== path)
+      await window.electronAPI.saveGames(games.value)
+      selectedGame.value = games.value[idx]
+      
+      if (targetDirectory.value === path) {
+        targetDirectory.value = selectedGame.value.rootPath
+      }
+    }
+
+    // 拖拽处理
+    const handleDrop = async (e) => {
+      isDragging.value = false
+      
+      const items = e.dataTransfer.files
+      pendingFiles.value = []
+      
+      for (const item of items) {
+        const info = await window.electronAPI.getFileInfo(item.path)
+        if (info.exists) {
+          if (info.isDirectory) {
+            // 递归获取文件夹内容
+            const contents = await getDirectoryContents(item.path)
+            pendingFiles.value.push(...contents)
+          } else {
+            pendingFiles.value.push({
+              path: item.path,
+              name: item.name,
+              size: info.size
+            })
+          }
+        }
+      }
+      
+      if (pendingFiles.value.length > 0) {
+        installModName.value = `Mod ${(selectedGame.value.mods?.length || 0) + 1}`
+        installModDesc.value = ''
+        showInstallModal.value = true
+      }
+    }
+
+    const getDirectoryContents = async (dirPath) => {
+      const results = []
+      const scanDir = async (currentPath, basePath) => {
+        const items = await window.electronAPI.listDirectory(currentPath)
+        if (!items.success) return
+        
+        for (const item of items.files) {
+          if (item.isDirectory) {
+            await scanDir(item.path, basePath)
+          } else {
+            results.push({
+              path: item.path,
+              name: item.name,
+              size: item.size,
+              relativePath: item.path.replace(basePath, '').replace(/^[\\\/]/, '')
+            })
+          }
+        }
+      }
+      
+      await scanDir(dirPath, dirPath)
+      return results
+    }
+
+    // 选择文件
+    const selectFiles = async () => {
+      const paths = await window.electronAPI.selectFiles()
+      if (!paths?.length) return
+      
+      pendingFiles.value = []
+      
+      for (const p of paths) {
+        const info = await window.electronAPI.getFileInfo(p)
+        if (info.exists) {
+          if (info.isDirectory) {
+            const contents = await getDirectoryContents(p)
+            pendingFiles.value.push(...contents)
+          } else {
+            pendingFiles.value.push({
+              path: p,
+              name: p.split(/[\\/]/).pop(),
+              size: info.size
+            })
+          }
+        }
+      }
+      
+      if (pendingFiles.value.length > 0) {
+        installModName.value = `Mod ${(selectedGame.value.mods?.length || 0) + 1}`
+        installModDesc.value = ''
+        showInstallModal.value = true
+      }
+    }
+
+    const clearPendingFiles = () => {
+      pendingFiles.value = []
+    }
+
+    const cancelInstall = () => {
+      showInstallModal.value = false
+      pendingFiles.value = []
+    }
+
+    const confirmInstall = async () => {
+      if (pendingFiles.value.length === 0) return
+      
+      showInstallModal.value = false
+      
+      const result = await window.electronAPI.installMod({
+        gameId: selectedGame.value.id,
+        modName: installModName.value,
+        modDescription: installModDesc.value,
+        sourceItems: [...new Set(pendingFiles.value.map(f => f.path))],
+        targetDir: targetDirectory.value
+      })
+      
+      if (result.success) {
+        await loadGames()
+        selectedGame.value = games.value.find(g => g.id === selectedGame.value.id)
+        showToast(`Mod "${installModName.value}" 安装成功！`)
+        pendingFiles.value = []
+      } else {
+        showToast('安装失败: ' + result.error, 'error')
+      }
+    }
+
+    // Mod 操作
+    const showModFiles = (mod) => {
+      selectedMod.value = mod
+      showFilesModal.value = true
+    }
+
+    const restoreMod = async (modId) => {
+      if (!confirm('确定要还原这个 Mod 吗？\n这将恢复被替换的文件并删除新增的文件。')) return
+      
+      const result = await window.electronAPI.restoreMod({
+        gameId: selectedGame.value.id,
+        modId: modId
+      })
+      
+      if (result.success) {
+        await loadGames()
+        selectedGame.value = games.value.find(g => g.id === selectedGame.value.id)
+        showToast('Mod 已还原')
+      } else {
+        showToast('还原失败: ' + result.error, 'error')
+      }
+    }
+
+    const restoreAllMods = async () => {
+      if (!confirm('确定要还原所有 Mod 吗？\n这将恢复游戏到安装 Mod 之前的状态。')) return
+      
+      const result = await window.electronAPI.restoreAllMods({
+        gameId: selectedGame.value.id
+      })
+      
+      if (result.success) {
+        await loadGames()
+        selectedGame.value = games.value.find(g => g.id === selectedGame.value.id)
+        showToast('所有 Mod 已还原')
+      }
+    }
+
+    // 监听设置弹窗
+    watch(showSettings, (val) => {
       if (val && selectedGame.value) {
-        editGameData.name = selectedGame.value.name
-        editGameData.rootPath = selectedGame.value.rootPath
+        editGameName.value = selectedGame.value.name
+        editGamePath.value = selectedGame.value.rootPath
       }
     })
 
-    // 初始化
-    onMounted(() => {
-      loadGames()
-    })
+    onMounted(loadGames)
 
     return {
-      games,
-      selectedGame,
-      activeTab,
-      selectedDirectory,
-      showAddGameModal,
-      showEditGameModal,
-      showAddDirModal,
-      showInstallModal,
-      isDragging,
-      pendingFiles,
-      installStatus,
-      installProgress,
-      newGame,
-      editGameData,
-      newDirectory,
+      games, selectedGame, targetDirectory,
+      showAddGameModal, showAddDirModal, showInstallModal, showFilesModal, showSettings,
+      isDragging, pendingFiles, installModName, installModDesc,
+      selectedMod, editGameName, editGamePath, toast,
+      newGame, newDir,
       
-      minimizeWindow,
-      maximizeWindow,
-      closeWindow,
-      selectGame,
-      selectGameRootPath,
-      addGame,
-      selectEditRootPath,
-      updateGame,
-      openGameFolder,
-      confirmDeleteGame,
-      selectDirectoryPath,
-      addDirectory,
-      handleDrop,
-      selectFiles,
-      clearPendingFiles,
-      removePendingFile,
-      installMods,
-      restoreMod,
-      restoreAllMods,
-      deleteHistory,
-      
-      getGameIcon,
-      getFileIcon,
-      truncatePath,
-      formatFileSize,
-      formatDate
+      showToast, getGameIcon, getModIcon, getFileIcon, formatSize, formatDate,
+      minimizeWindow, maximizeWindow, closeWindow,
+      loadGames, selectGame, openFolder,
+      openAddGameModal, closeAddGameModal, selectGameRootPath, addGame,
+      confirmDeleteGame, selectEditPath, updateGame,
+      selectDirPath, addDirectory, removeDirectory,
+      handleDrop, selectFiles, clearPendingFiles, cancelInstall, confirmInstall,
+      showModFiles, restoreMod, restoreAllMods
     }
   }
 }
@@ -826,7 +939,7 @@ export default {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: var(--bg-primary);
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
   overflow: hidden;
 }
 
@@ -835,70 +948,92 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 40px;
-  background: linear-gradient(180deg, rgba(26, 26, 46, 0.98) 0%, rgba(22, 33, 62, 0.95) 100%);
-  border-bottom: 1px solid var(--border-color);
+  height: 52px;
+  background: rgba(26, 26, 46, 0.95);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   -webkit-app-region: drag;
   flex-shrink: 0;
+  padding: 0 8px;
 }
 
 .title-bar-drag {
   flex: 1;
   display: flex;
   align-items: center;
-  padding-left: 16px;
 }
 
 .title-bar-logo {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  padding-left: 12px;
 }
 
-.logo-icon {
-  font-size: 20px;
+.logo-pixel {
+  font-size: 28px;
+  filter: drop-shadow(0 2px 8px rgba(233, 69, 96, 0.4));
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
 }
 
 .logo-text {
-  font-size: 14px;
-  font-weight: 700;
-  background: linear-gradient(135deg, var(--accent-primary), var(--accent-tertiary));
+  display: flex;
+  flex-direction: column;
+}
+
+.logo-main {
+  font-size: 16px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #e94560, #feca57);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  background-clip: text;
+  letter-spacing: 0.5px;
+}
+
+.logo-sub {
+  font-size: 11px;
+  color: #718096;
+  margin-top: -2px;
 }
 
 .title-bar-controls {
   display: flex;
+  gap: 4px;
   -webkit-app-region: no-drag;
 }
 
-.title-bar-btn {
-  width: 46px;
-  height: 40px;
+.title-btn {
+  width: 40px;
+  height: 32px;
   border: none;
   background: transparent;
-  color: var(--text-secondary);
+  border-radius: 8px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all var(--transition-fast);
+  transition: all 0.2s;
+  color: #718096;
 }
 
-.title-bar-btn svg {
-  width: 12px;
-  height: 12px;
+.title-btn svg {
+  width: 16px;
+  height: 16px;
 }
 
-.title-bar-btn:hover {
+.title-btn:hover {
   background: rgba(255, 255, 255, 0.1);
-  color: var(--text-primary);
+  color: #fff;
 }
 
-.title-bar-btn.close:hover {
-  background: var(--accent-primary);
-  color: white;
+.title-btn.close:hover {
+  background: #e94560;
+  color: #fff;
 }
 
 /* ===== Main Content ===== */
@@ -910,72 +1045,159 @@ export default {
 
 /* ===== Sidebar ===== */
 .sidebar {
-  width: 280px;
-  background: var(--bg-secondary);
-  border-right: 1px solid var(--border-color);
+  width: 260px;
+  background: rgba(22, 33, 62, 0.5);
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
 }
 
 .sidebar-header {
-  padding: 20px 16px;
-  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 16px 12px;
 }
 
 .sidebar-header h3 {
-  font-size: 0.85rem;
-  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #718096;
   text-transform: uppercase;
   letter-spacing: 1px;
-  margin-bottom: 12px;
+}
+
+.sidebar-icon {
+  font-size: 16px;
+}
+
+.btn-add-game {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: linear-gradient(135deg, #e94560, #ff6b6b);
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  transition: all 0.2s;
+  box-shadow: 0 4px 12px rgba(233, 69, 96, 0.3);
+}
+
+.btn-add-game:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(233, 69, 96, 0.4);
+}
+
+.btn-add-game svg {
+  width: 18px;
+  height: 18px;
 }
 
 .game-list {
   flex: 1;
   overflow-y: auto;
-  padding: 12px;
+  padding: 8px 12px 12px;
 }
 
 .game-card {
-  padding: 16px;
-  margin-bottom: 12px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  margin-bottom: 8px;
+  background: rgba(31, 41, 55, 0.5);
+  border: 2px solid transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.25s;
+}
+
+.game-card:hover {
+  background: rgba(31, 41, 55, 0.8);
+  border-color: rgba(233, 69, 96, 0.3);
 }
 
 .game-card.selected {
-  border-color: var(--accent-primary);
+  background: rgba(233, 69, 96, 0.15);
+  border-color: #e94560;
 }
 
-.game-icon {
+.game-card-indicator {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 6px;
+  background: #10b981;
+  border-radius: 50%;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.game-card.selected .game-card-indicator {
+  opacity: 1;
+}
+
+.game-card-icon {
   font-size: 32px;
-  margin-bottom: 12px;
+  line-height: 1;
 }
 
-.game-info {
+.game-card-info {
+  flex: 1;
   min-width: 0;
 }
 
-.game-name {
-  font-size: 1rem;
+.game-card-name {
+  font-size: 14px;
   font-weight: 700;
-  margin-bottom: 4px;
+  color: #fff;
+  margin: 0 0 4px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.game-path {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  margin-bottom: 8px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.game-meta {
+.game-card-stats {
   display: flex;
-  gap: 6px;
+  gap: 12px;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #718096;
+}
+
+.stat-icon {
+  font-size: 12px;
+}
+
+.empty-games {
+  text-align: center;
+  padding: 40px 16px;
+}
+
+.empty-games .empty-icon {
+  font-size: 48px;
+  opacity: 0.5;
+  margin-bottom: 12px;
+}
+
+.empty-games p {
+  color: #718096;
+  margin-bottom: 16px;
 }
 
 /* ===== Panel ===== */
@@ -984,6 +1206,7 @@ export default {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background: linear-gradient(180deg, rgba(26, 26, 46, 0.3) 0%, rgba(26, 26, 46, 0.8) 100%);
 }
 
 /* ===== Welcome Screen ===== */
@@ -997,53 +1220,83 @@ export default {
 
 .welcome-content {
   text-align: center;
-  max-width: 500px;
+  max-width: 600px;
+}
+
+.welcome-hero {
+  margin-bottom: 48px;
 }
 
 .welcome-icon {
-  font-size: 80px;
+  position: relative;
+  display: inline-block;
   margin-bottom: 24px;
-  animation: bounce 2s ease-in-out infinite;
 }
 
-.welcome-content h1 {
-  font-size: 2.5rem;
-  margin-bottom: 16px;
-  background: linear-gradient(135deg, var(--accent-primary), var(--accent-tertiary));
+.icon-main {
+  font-size: 80px;
+  filter: drop-shadow(0 8px 24px rgba(233, 69, 96, 0.4));
+}
+
+.icon-float {
+  position: absolute;
+  top: -10px;
+  right: -20px;
+  font-size: 32px;
+  animation: float 2s ease-in-out infinite;
+}
+
+.welcome-hero h1 {
+  font-size: 36px;
+  margin-bottom: 12px;
+  background: linear-gradient(135deg, #e94560, #feca57);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  background-clip: text;
 }
 
-.welcome-content p {
-  color: var(--text-secondary);
-  font-size: 1.1rem;
-  margin-bottom: 32px;
+.welcome-tagline {
+  font-size: 16px;
+  color: #718096;
 }
 
 .welcome-features {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 16px;
+  margin-bottom: 32px;
 }
 
-.feature {
+.feature-card {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 16px;
-  background: var(--bg-card);
-  border-radius: var(--border-radius);
-  border: 1px solid var(--border-color);
+  gap: 16px;
+  padding: 20px;
+  background: rgba(31, 41, 55, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  transition: all 0.3s;
+}
+
+.feature-card:hover {
+  background: rgba(31, 41, 55, 0.8);
+  border-color: rgba(233, 69, 96, 0.3);
+  transform: translateY(-2px);
 }
 
 .feature-icon {
-  font-size: 24px;
+  font-size: 32px;
 }
 
-.feature span:last-child {
-  font-weight: 600;
-  color: var(--text-secondary);
+.feature-text h4 {
+  font-size: 14px;
+  margin: 0 0 2px;
+  color: #fff;
+}
+
+.feature-text p {
+  font-size: 12px;
+  color: #718096;
+  margin: 0;
 }
 
 /* ===== Game Detail ===== */
@@ -1051,16 +1304,17 @@ export default {
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
+  padding: 24px;
 }
 
 .game-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 24px;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .game-header-left {
@@ -1069,19 +1323,33 @@ export default {
   gap: 16px;
 }
 
-.game-header-icon {
-  font-size: 48px;
+.game-avatar {
+  width: 64px;
+  height: 64px;
+  background: linear-gradient(135deg, #e94560, #ff6b6b);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  box-shadow: 0 8px 24px rgba(233, 69, 96, 0.3);
 }
 
-.game-header h2 {
+.game-header-info h2 {
+  margin: 0 0 4px;
+  font-size: 24px;
+}
+
+.game-path {
+  font-size: 13px;
+  color: #718096;
+  cursor: pointer;
   margin: 0;
-  font-size: 1.5rem;
+  transition: color 0.2s;
 }
 
-.game-path-full {
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  margin: 4px 0 0 0;
+.game-path:hover {
+  color: #e94560;
 }
 
 .game-header-actions {
@@ -1089,265 +1357,650 @@ export default {
   gap: 8px;
 }
 
-/* ===== Tabs ===== */
-.tabs {
-  display: flex;
-  gap: 4px;
-  padding: 16px 24px;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-color);
-}
-
-.tab {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 20px;
-  background: transparent;
-  border: none;
-  border-radius: var(--border-radius);
-  color: var(--text-secondary);
-  font-family: var(--font-family);
-  font-size: 0.95rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.tab:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text-primary);
-}
-
-.tab.active {
-  background: var(--accent-primary);
-  color: white;
-}
-
-/* ===== Tab Content ===== */
-.tab-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 24px;
-}
-
-.section {
+/* ===== Target Section ===== */
+.target-section {
   margin-bottom: 24px;
 }
 
-.section-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 1.1rem;
-  margin-bottom: 16px;
-}
-
-.section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-
-.section-header .section-title {
-  margin-bottom: 0;
-}
-
-/* ===== Directory List ===== */
-.directory-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.directory-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px;
-  background: var(--bg-card);
-  border: 2px solid var(--border-color);
-  border-radius: var(--border-radius);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.directory-item:hover {
-  border-color: rgba(233, 69, 96, 0.5);
-  background: var(--bg-card-hover);
-}
-
-.directory-item.selected {
-  border-color: var(--accent-primary);
-  background: rgba(233, 69, 96, 0.1);
-}
-
-.dir-icon {
-  font-size: 24px;
-}
-
-.dir-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.dir-name {
-  display: block;
-  font-weight: 600;
-  margin-bottom: 2px;
-}
-
-.dir-path {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.check-icon {
-  color: var(--accent-primary);
-  font-size: 1.2rem;
-  font-weight: bold;
-}
-
-/* ===== Drop Zone ===== */
-.drop-zone {
-  padding: 48px 32px;
-}
-
-.drop-zone.active {
-  background: rgba(233, 69, 96, 0.1);
-  border-color: var(--accent-primary);
-}
-
-.drop-zone-icon {
-  transition: transform var(--transition-normal);
-}
-
-.drop-zone:hover .drop-zone-icon,
-.drop-zone.active .drop-zone-icon {
-  transform: scale(1.2);
-}
-
-/* ===== Pending Files ===== */
-.pending-header {
+.target-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 12px;
 }
 
-.pending-header h4 {
+.target-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
   margin: 0;
-  font-size: 0.95rem;
-  color: var(--text-secondary);
 }
 
-.file-list {
+.section-icon {
+  font-size: 18px;
+}
+
+.target-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.target-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: rgba(31, 41, 55, 0.5);
+  border: 2px solid transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.target-item:hover {
+  background: rgba(31, 41, 55, 0.8);
+}
+
+.target-item.selected {
+  border-color: #e94560;
+  background: rgba(233, 69, 96, 0.1);
+}
+
+.target-icon {
+  font-size: 20px;
+}
+
+.target-info {
   display: flex;
   flex-direction: column;
+}
+
+.target-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.target-path {
+  font-size: 11px;
+  color: #718096;
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.target-check {
+  color: #10b981;
+  font-weight: bold;
+}
+
+.target-remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: #ef4444;
+  color: #fff;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.target-item:hover .target-remove {
+  opacity: 1;
+}
+
+/* ===== Drop Zone ===== */
+.drop-zone {
+  border: 2px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 20px;
+  padding: 48px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s;
+  margin-bottom: 24px;
+  background: rgba(31, 41, 55, 0.3);
+}
+
+.drop-zone:hover {
+  border-color: rgba(233, 69, 96, 0.5);
+  background: rgba(233, 69, 96, 0.05);
+}
+
+.drop-zone.active {
+  border-color: #e94560;
+  background: rgba(233, 69, 96, 0.1);
+  border-style: solid;
+}
+
+.drop-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.drop-icon {
+  font-size: 48px;
+}
+
+.drop-icon .bounce {
+  animation: bounce 0.6s ease infinite;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.drop-text h3 {
+  margin: 0 0 4px;
+  font-size: 18px;
+  color: #fff;
+}
+
+.drop-text p {
+  margin: 0;
+  font-size: 14px;
+  color: #718096;
+}
+
+/* ===== Mod Section ===== */
+.mod-section {
+  flex: 1;
+}
+
+.mod-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.mod-header h3 {
+  display: flex;
+  align-items: center;
   gap: 8px;
-  max-height: 200px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+}
+
+.mod-count {
+  background: linear-gradient(135deg, #e94560, #ff6b6b);
+  color: #fff;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-left: 8px;
+}
+
+.empty-mods {
+  text-align: center;
+  padding: 48px;
+  background: rgba(31, 41, 55, 0.3);
+  border-radius: 16px;
+}
+
+.empty-mods .empty-icon {
+  font-size: 48px;
+  opacity: 0.5;
+  margin-bottom: 12px;
+}
+
+.empty-mods p {
+  color: #fff;
+  margin: 0 0 4px;
+}
+
+.empty-mods span {
+  font-size: 13px;
+  color: #718096;
+}
+
+.mod-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mod-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: rgba(31, 41, 55, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  transition: all 0.2s;
+}
+
+.mod-card:hover {
+  background: rgba(31, 41, 55, 0.8);
+  border-color: rgba(233, 69, 96, 0.3);
+}
+
+.mod-icon {
+  font-size: 36px;
+}
+
+.mod-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.mod-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.mod-title h4 {
+  margin: 0;
+  font-size: 15px;
+  color: #fff;
+}
+
+.mod-date {
+  font-size: 12px;
+  color: #718096;
+}
+
+.mod-desc {
+  font-size: 13px;
+  color: #a0aec0;
+  margin: 0 0 8px;
+}
+
+.mod-stats {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.mod-stats .stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #718096;
+}
+
+.stat-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.stat-dot.new { background: #10b981; }
+.stat-dot.replace { background: #f59e0b; }
+
+.stat-total {
+  font-size: 12px;
+  color: #718096;
+}
+
+.mod-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ===== Modal ===== */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: #1f2937;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  width: 90%;
+  max-width: 480px;
+  max-height: 85vh;
+  overflow: hidden;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4);
+}
+
+.modal-lg {
+  max-width: 640px;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.modal-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 18px;
+  color: #fff;
+}
+
+.modal-icon {
+  font-size: 24px;
+}
+
+.btn-close {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 20px;
+  transition: all 0.2s;
+}
+
+.btn-close:hover {
+  background: rgba(239, 68, 68, 0.5);
+}
+
+.modal-body {
+  padding: 24px;
+  overflow-y: auto;
+  max-height: calc(85vh - 140px);
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(26, 26, 46, 0.5);
+}
+
+/* ===== Form ===== */
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #a0aec0;
+  margin-bottom: 8px;
+}
+
+.form-input {
+  width: 100%;
+  padding: 12px 16px;
+  font-size: 14px;
+  color: #fff;
+  background: rgba(31, 41, 55, 0.8);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #e94560;
+  box-shadow: 0 0 0 3px rgba(233, 69, 96, 0.2);
+}
+
+.input-group {
+  display: flex;
+  gap: 8px;
+}
+
+.input-group .form-input {
+  flex: 1;
+}
+
+/* ===== Install Files ===== */
+.install-files {
+  background: rgba(26, 26, 46, 0.5);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.files-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: #a0aec0;
+}
+
+.files-list {
+  max-height: 150px;
   overflow-y: auto;
 }
 
 .file-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  background: var(--bg-secondary);
-  border-radius: var(--border-radius);
-  border: 1px solid var(--border-color);
+  gap: 8px;
+  padding: 8px 0;
+  font-size: 13px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.file-item:last-child {
+  border-bottom: none;
 }
 
 .file-icon {
-  font-size: 20px;
+  font-size: 16px;
 }
 
 .file-name {
   flex: 1;
-  font-size: 0.9rem;
+  color: #fff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .file-size {
-  font-size: 0.8rem;
-  color: var(--text-muted);
+  color: #718096;
+  font-size: 12px;
 }
 
-.pending-actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
-/* ===== History List ===== */
-.history-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.history-files {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.file-tag {
-  font-size: 0.75rem;
-  padding: 4px 8px;
-  background: var(--bg-tertiary);
-  border-radius: 4px;
-  color: var(--text-secondary);
-}
-
-.more-tag {
-  font-size: 0.75rem;
-  padding: 4px 8px;
-  background: rgba(233, 69, 96, 0.2);
-  border-radius: 4px;
-  color: var(--accent-primary);
-}
-
-/* ===== Install Progress ===== */
-.install-progress {
+.file-more {
   text-align: center;
+  padding: 8px;
+  color: #718096;
+  font-size: 12px;
 }
 
-.progress-text {
-  margin-bottom: 16px;
-  font-size: 1rem;
-  color: var(--text-secondary);
+/* ===== File Detail List ===== */
+.file-detail-list {
+  max-height: 400px;
+  overflow-y: auto;
 }
 
-.progress-bar {
-  height: 8px;
-  background: var(--bg-tertiary);
-  border-radius: 4px;
-  overflow: hidden;
+.file-detail-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 13px;
 }
 
-.progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--accent-primary), var(--accent-tertiary));
-  border-radius: 4px;
-  transition: width var(--transition-normal);
+.file-type {
+  font-size: 16px;
 }
 
-/* ===== Hint ===== */
-.hint {
-  font-size: 0.8rem;
-  color: var(--text-muted);
+.file-path {
+  flex: 1;
+  color: #a0aec0;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+/* ===== Buttons ===== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.btn-sm {
+  padding: 8px 14px;
+  font-size: 13px;
+}
+
+.btn-lg {
+  padding: 14px 28px;
+  font-size: 16px;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #e94560, #ff6b6b);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(233, 69, 96, 0.3);
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(233, 69, 96, 0.4);
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.btn-success {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.btn-warning {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #1a1a2e;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.btn-danger {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.3);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: #a0aec0;
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+/* ===== Toast ===== */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px;
+  background: #1f2937;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  font-size: 14px;
+  color: #fff;
+  z-index: 2000;
+  animation: slideUp 0.3s ease;
+}
+
+.toast.success {
+  border-left: 4px solid #10b981;
+}
+
+.toast.error {
+  border-left: 4px solid #ef4444;
+}
+
+.toast-icon {
+  font-size: 18px;
 }
 
 /* ===== Animations ===== */
-@keyframes bounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
+.animate-fadeIn { animation: fadeIn 0.3s ease; }
+.animate-slideUp { animation: slideUp 0.4s ease; }
+.animate-scaleIn { animation: scaleIn 0.3s ease; }
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
 }
 </style>

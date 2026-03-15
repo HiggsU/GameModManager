@@ -28,5 +28,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   listDirectory: (dirPath) => ipcRenderer.invoke('list-directory', dirPath),
   openFolder: (folderPath) => ipcRenderer.invoke('open-folder', folderPath),
   pathExists: (filePath) => ipcRenderer.invoke('path-exists', filePath),
-  getFileInfo: (filePath) => ipcRenderer.invoke('get-file-info', filePath)
+  getFileInfo: (filePath) => ipcRenderer.invoke('get-file-info', filePath),
+  
+  // 新增：递归获取文件夹内容
+  getDirectoryContents: (dirPath) => ipcRenderer.invoke('get-directory-contents', dirPath)
 })
