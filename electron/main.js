@@ -32,8 +32,10 @@ function createWindow() {
     icon: path.join(__dirname, '../public/icon.ico')
   })
 
-  // 开发模式
-  if (process.env.NODE_ENV === 'development') {
+  // 开发模式检测
+  const isDev = process.argv.includes('--dev') || !require('electron').app.isPackaged
+  
+  if (isDev) {
     mainWindow.loadURL('http://localhost:5173')
     mainWindow.webContents.openDevTools()
   } else {
