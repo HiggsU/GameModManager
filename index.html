@@ -3,12 +3,57 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com">
     <title>🎮 Game Mod Manager</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+      /* 预加载样式 - 防止白屏闪烁 */
+      html, body, #app {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        background: #1a1a2e;
+        color: #ffffff;
+        font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      }
+      /* 加载动画 */
+      .loading-screen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: #1a1a2e;
+        z-index: 9999;
+      }
+      .loading-icon {
+        font-size: 64px;
+        animation: bounce 1s ease-in-out infinite;
+      }
+      .loading-text {
+        margin-top: 16px;
+        font-size: 18px;
+        color: #a0aec0;
+      }
+      @keyframes bounce {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-10px); }
+      }
+    </style>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <div class="loading-screen">
+        <div class="loading-icon">🎮</div>
+        <div class="loading-text">加载中...</div>
+      </div>
+    </div>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
