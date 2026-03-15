@@ -1,0 +1,42 @@
+{
+  "name": "game-mod-manager",
+  "version": "1.0.0",
+  "description": "🎮 游戏Mod管理器 - 简化游戏打mod操作",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "electron:build": "vite build && electron-builder",
+    "electron:preview": "vite build && electron ."
+  },
+  "dependencies": {
+    "vue": "^3.4.21",
+    "pinia": "^2.1.7",
+    "electron-store": "^8.2.0",
+    "fs-extra": "^11.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.4",
+    "vite": "^5.2.0",
+    "electron": "^30.0.0",
+    "electron-builder": "^24.13.3",
+    "concurrently": "^8.2.2",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.gamemod.manager",
+    "productName": "Game Mod Manager",
+    "directories": {
+      "output": "dist_electron"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*"
+    ],
+    "win": {
+      "icon": "public/icon.ico",
+      "target": "nsis"
+    }
+  }
+}
