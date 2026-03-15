@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 文件/文件夹选择
   selectFolder: () => ipcRenderer.invoke('select-folder'),
   selectFiles: () => ipcRenderer.invoke('select-files'),
+  selectItem: () => ipcRenderer.invoke('select-item'),
 
   // 游戏项目管理
   getGames: () => ipcRenderer.invoke('get-games'),
@@ -20,7 +21,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Mod 操作
   installMod: (data) => ipcRenderer.invoke('install-mod', data),
+  deleteForMod: (data) => ipcRenderer.invoke('delete-for-mod', data),
   restoreMod: (data) => ipcRenderer.invoke('restore-mod', data),
+  reinstallMod: (data) => ipcRenderer.invoke('reinstall-mod', data),
   restoreAllMods: (data) => ipcRenderer.invoke('restore-all-mods', data),
   deleteModHistory: (data) => ipcRenderer.invoke('delete-mod-history', data),
 
@@ -28,8 +31,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   listDirectory: (dirPath) => ipcRenderer.invoke('list-directory', dirPath),
   openFolder: (folderPath) => ipcRenderer.invoke('open-folder', folderPath),
   pathExists: (filePath) => ipcRenderer.invoke('path-exists', filePath),
-  getFileInfo: (filePath) => ipcRenderer.invoke('get-file-info', filePath),
-  
-  // 新增：递归获取文件夹内容
-  getDirectoryContents: (dirPath) => ipcRenderer.invoke('get-directory-contents', dirPath)
+  getFileInfo: (filePath) => ipcRenderer.invoke('get-file-info', filePath)
 })
