@@ -70,11 +70,10 @@ function createWindow() {
   })
 
   const isDev = process.argv.includes('--dev')
-  
+
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173')
-    // 开发模式下打开开发者工具
-    mainWindow.webContents.openDevTools()
+    // 需要调试时按 F12 打开开发者工具
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
   }
