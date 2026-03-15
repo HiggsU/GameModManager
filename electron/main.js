@@ -71,7 +71,7 @@ function createWindow() {
   
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173')
-    mainWindow.webContents.openDevTools()
+    // 不自动打开 DevTools，需要时可手动按 F12
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
   }

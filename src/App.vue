@@ -1,5 +1,5 @@
 <template>
-  <div class="app-container">
+  <div class="app-container" :class="{ 'light-mode': isLightMode }">
     <!-- 自定义标题栏 -->
     <div class="title-bar">
       <div class="title-bar-drag">
@@ -12,6 +12,22 @@
         </div>
       </div>
       <div class="title-bar-controls">
+        <button class="title-btn theme-toggle" @click="toggleTheme" :title="isLightMode ? '切换到深色模式' : '切换到浅色模式'">
+          <svg v-if="isLightMode" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+          <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"/>
+            <line x1="12" y1="1" x2="12" y2="3"/>
+            <line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1" y1="12" x2="3" y2="12"/>
+            <line x1="21" y1="12" x2="23" y2="12"/>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+          </svg>
+        </button>
         <button class="title-btn minimize" @click="minimizeWindow" title="最小化">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M5 12h14"/>
@@ -542,6 +558,9 @@ import { ref, reactive, onMounted, watch } from 'vue'
 export default {
   name: 'App',
   setup() {
+    // 主题模式
+    const isLightMode = ref(true) // 默认浅色模式
+    
     // 状态
     const games = ref([])
     const selectedGame = ref(null)
@@ -630,6 +649,11 @@ export default {
     const minimizeWindow = () => window.electronAPI.minimize()
     const maximizeWindow = () => window.electronAPI.maximize()
     const closeWindow = () => window.electronAPI.close()
+    
+    // 主题切换
+    const toggleTheme = () => {
+      isLightMode.value = !isLightMode.value
+    }
 
     // 加载游戏
     const loadGames = async () => {
@@ -914,6 +938,7 @@ export default {
     onMounted(loadGames)
 
     return {
+      isLightMode,
       games, selectedGame, targetDirectory,
       showAddGameModal, showAddDirModal, showInstallModal, showFilesModal, showSettings,
       isDragging, pendingFiles, installModName, installModDesc,
@@ -921,7 +946,7 @@ export default {
       newGame, newDir,
       
       showToast, getGameIcon, getModIcon, getFileIcon, formatSize, formatDate,
-      minimizeWindow, maximizeWindow, closeWindow,
+      minimizeWindow, maximizeWindow, closeWindow, toggleTheme,
       loadGames, selectGame, openFolder,
       openAddGameModal, closeAddGameModal, selectGameRootPath, addGame,
       confirmDeleteGame, selectEditPath, updateGame,
@@ -1034,6 +1059,24 @@ export default {
 .title-btn.close:hover {
   background: #e94560;
   color: #fff;
+}
+
+.title-btn.theme-toggle {
+  color: #feca57;
+}
+
+.title-btn.theme-toggle:hover {
+  background: rgba(254, 202, 87, 0.2);
+  color: #feca57;
+}
+
+.light-mode .title-btn.theme-toggle {
+  color: #f59e0b;
+}
+
+.light-mode .title-btn.theme-toggle:hover {
+  background: rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
 }
 
 /* ===== Main Content ===== */
@@ -2002,5 +2045,227 @@ export default {
 @keyframes scaleIn {
   from { opacity: 0; transform: scale(0.95); }
   to { opacity: 1; transform: scale(1); }
+}
+
+/* ===== Light Mode ===== */
+.app-container.light-mode {
+  background: linear-gradient(135deg, #f0f4f8 0%, #e2e8f0 100%);
+}
+
+.light-mode .title-bar {
+  background: rgba(255, 255, 255, 0.95);
+  border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+
+.light-mode .logo-main {
+  background: linear-gradient(135deg, #e94560, #ff6b6b);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.light-mode .logo-sub {
+  color: #718096;
+}
+
+.light-mode .title-btn {
+  color: #718096;
+}
+
+.light-mode .title-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #1a1a2e;
+}
+
+.light-mode .sidebar {
+  background: rgba(255, 255, 255, 0.7);
+  border-right-color: rgba(0, 0, 0, 0.06);
+}
+
+.light-mode .sidebar-header h3 {
+  color: #718096;
+}
+
+.light-mode .game-card {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.light-mode .game-card:hover {
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.light-mode .game-card.selected {
+  background: rgba(233, 69, 96, 0.1);
+}
+
+.light-mode .game-card-name {
+  color: #1a1a2e;
+}
+
+.light-mode .panel {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.9) 100%);
+}
+
+.light-mode .welcome-hero h1 {
+  background: linear-gradient(135deg, #e94560, #ff6b6b);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.light-mode .welcome-tagline {
+  color: #718096;
+}
+
+.light-mode .feature-card {
+  background: rgba(255, 255, 255, 0.8);
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+.light-mode .feature-card:hover {
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.light-mode .feature-text h4 {
+  color: #1a1a2e;
+}
+
+.light-mode .game-header-info h2 {
+  color: #1a1a2e;
+}
+
+.light-mode .game-path {
+  color: #718096;
+}
+
+.light-mode .target-header h3,
+.light-mode .mod-header h3 {
+  color: #1a1a2e;
+}
+
+.light-mode .target-item {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.light-mode .target-item:hover {
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.light-mode .target-name {
+  color: #1a1a2e;
+}
+
+.light-mode .drop-zone {
+  background: rgba(255, 255, 255, 0.5);
+  border-color: rgba(0, 0, 0, 0.15);
+}
+
+.light-mode .drop-zone:hover {
+  border-color: rgba(233, 69, 96, 0.5);
+}
+
+.light-mode .drop-text h3 {
+  color: #1a1a2e;
+}
+
+.light-mode .drop-text p {
+  color: #718096;
+}
+
+.light-mode .empty-mods {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.light-mode .empty-mods p {
+  color: #1a1a2e;
+}
+
+.light-mode .mod-card {
+  background: rgba(255, 255, 255, 0.8);
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+.light-mode .mod-card:hover {
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.light-mode .mod-title h4 {
+  color: #1a1a2e;
+}
+
+.light-mode .mod-desc {
+  color: #4a5568;
+}
+
+.light-mode .modal {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+.light-mode .modal-header h3 {
+  color: #1a1a2e;
+}
+
+.light-mode .modal-footer {
+  background: #f7fafc;
+  border-top-color: rgba(0, 0, 0, 0.06);
+}
+
+.light-mode .form-input {
+  background: #f7fafc;
+  border-color: rgba(0, 0, 0, 0.15);
+  color: #1a1a2e;
+}
+
+.light-mode .form-label {
+  color: #4a5568;
+}
+
+.light-mode .install-files {
+  background: #f7fafc;
+}
+
+.light-mode .files-header {
+  color: #4a5568;
+}
+
+.light-mode .file-name {
+  color: #1a1a2e;
+}
+
+.light-mode .file-detail-item {
+  border-bottom-color: rgba(0, 0, 0, 0.05);
+}
+
+.light-mode .file-path {
+  color: #4a5568;
+}
+
+.light-mode .toast {
+  background: #ffffff;
+  color: #1a1a2e;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.light-mode .btn-secondary {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #1a1a2e;
+}
+
+.light-mode .btn-secondary:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.light-mode .btn-ghost {
+  color: #718096;
+}
+
+.light-mode .btn-ghost:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.05);
+  color: #1a1a2e;
+}
+
+.light-mode .btn-close {
+  background: rgba(0, 0, 0, 0.05);
+  color: #1a1a2e;
 }
 </style>
