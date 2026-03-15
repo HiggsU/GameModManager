@@ -69,7 +69,7 @@ function createWindow() {
     }
   })
 
-  const isDev = process.argv.includes('--dev') || !app.isPackaged
+  const isDev = process.argv.includes('--dev')
   
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173')
@@ -606,57 +606,62 @@ ipcMain.handle('restore-mod', async (event, { gameId, modId }) => {
     }
   }
 
-  // 删除新增的文件，并收集涉及的目录
-  const affectedDirs = new Set()
+  // 删除新增的文件
+  console.log('=== 还原 Mod ===')
+  console.log('Mod:', mod.name)
+  console.log('新增文件数:', mod.files?.filter(f => f.operationType === 'new').length || 0)
+  console.log('createdDirs:', mod.createdDirs)
+  
   for (const file of mod.files || []) {
     if (file.operationType === 'new') {
       try {
-        // 收集文件的父目录
-        let parentDir = path.dirname(file.destPath)
-        const targetDir = file.targetDir || game.rootPath
-        // 收集所有父目录（直到目标目录）
-        while (parentDir && parentDir !== targetDir && parentDir.length > targetDir.length) {
-          affectedDirs.add(parentDir)
-          parentDir = path.dirname(parentDir)
-        }
         await fs.remove(file.destPath)
+        console.log('已删除文件:', file.destPath)
       } catch (err) {
         errors.push({ file: file.destPath, error: err.message })
       }
     }
   }
 
-  // 智能清理空目录（从最深层的目录开始）
-  // 1. 先用 createdDirs（如果有）
+  // 清理空目录
+  const dirsToClean = []
+  
+  // 1. 从 createdDirs 收集
   if (mod.createdDirs && mod.createdDirs.length > 0) {
-    const sortedDirs = [...mod.createdDirs].sort((a, b) => b.path.length - a.path.length)
-    for (const dirInfo of sortedDirs) {
-      try {
-        const dirPath = dirInfo.path
-        if (await fs.pathExists(dirPath)) {
-          const contents = await fs.readdir(dirPath).catch(() => null)
-          if (contents && contents.length === 0) {
-            await fs.remove(dirPath)
-          }
+    dirsToClean.push(...mod.createdDirs.map(d => d.path || d))
+  }
+  
+  // 2. 从新增文件的父目录收集
+  for (const file of mod.files || []) {
+    if (file.operationType === 'new') {
+      const targetDir = file.targetDir || game.rootPath
+      let parentDir = path.dirname(file.destPath)
+      // 向上收集所有父目录（直到目标目录）
+      while (parentDir && parentDir !== targetDir && parentDir.length > targetDir.length) {
+        if (!dirsToClean.includes(parentDir)) {
+          dirsToClean.push(parentDir)
         }
-      } catch (err) {
-        // 忽略删除空目录的错误
+        parentDir = path.dirname(parentDir)
       }
     }
   }
-
-  // 2. 额外清理：检查删除文件后变空的目录
-  const sortedAffectedDirs = [...affectedDirs].sort((a, b) => b.length - a.length)
-  for (const dirPath of sortedAffectedDirs) {
+  
+  // 从最深层的目录开始清理
+  const sortedDirs = dirsToClean.sort((a, b) => b.length - a.length)
+  console.log('待清理目录:', sortedDirs)
+  
+  for (const dirPath of sortedDirs) {
     try {
       if (await fs.pathExists(dirPath)) {
         const contents = await fs.readdir(dirPath).catch(() => null)
+        console.log(`检查目录 ${dirPath}:`, contents ? `包含 ${contents.length} 项` : '无法读取')
         if (contents && contents.length === 0) {
           await fs.remove(dirPath)
+          console.log('已删除空目录:', dirPath)
         }
       }
     } catch (err) {
-      // 忽略删除空目录的错误
+      console.log('清理目录出错:', dirPath, err.message)
     }
   }
 
@@ -733,12 +738,16 @@ ipcMain.handle('restore-all-mods', async (event, { gameId }) => {
 
   const game = games[gameIndex]
   const errors = []
-  const allCreatedDirs = []
+  const allDirsToClean = []
+  
+  console.log('=== 还原所有 Mod ===')
   
   // 从后往前还原（保持顺序）
   for (let i = game.mods.length - 1; i >= 0; i--) {
     const mod = game.mods[i]
     if (mod.installed === false) continue  // 跳过已还原的
+    
+    console.log(`处理 Mod: ${mod.name}`)
     
     // 还原被删除的项目
     for (const deletedItem of mod.deletedItems || []) {
@@ -763,33 +772,40 @@ ipcMain.handle('restore-all-mods', async (event, { gameId }) => {
       }
     }
     
-    // 删除新增文件，同时收集涉及的目录
-    const modAffectedDirs = new Set()
+    // 删除新增文件
     for (const file of mod.files || []) {
       if (file.operationType === 'new') {
         try {
-          // 收集文件的父目录
-          let parentDir = path.dirname(file.destPath)
-          const targetDir = file.targetDir || game.rootPath
-          while (parentDir && parentDir !== targetDir && parentDir.length > targetDir.length) {
-            modAffectedDirs.add(parentDir)
-            parentDir = path.dirname(parentDir)
-          }
           await fs.remove(file.destPath)
+          console.log('已删除文件:', file.destPath)
         } catch (err) {
           errors.push({ file: file.destPath, error: err.message })
         }
       }
     }
-
-    // 收集 Mod 创建的目录
-    if (mod.createdDirs) {
-      allCreatedDirs.push(...mod.createdDirs)
+    
+    // 收集所有需要清理的目录
+    // 1. 从 createdDirs
+    if (mod.createdDirs && mod.createdDirs.length > 0) {
+      for (const d of mod.createdDirs) {
+        const dirPath = d.path || d
+        if (!allDirsToClean.includes(dirPath)) {
+          allDirsToClean.push(dirPath)
+        }
+      }
     }
-    // 同时收集智能检测的目录
-    for (const dir of modAffectedDirs) {
-      if (!allCreatedDirs.some(d => d.path === dir)) {
-        allCreatedDirs.push({ path: dir })
+    
+    // 2. 从新增文件的父目录
+    for (const file of mod.files || []) {
+      if (file.operationType === 'new') {
+        const targetDir = file.targetDir || game.rootPath
+        let parentDir = path.dirname(file.destPath)
+        while (parentDir && parentDir !== targetDir && parentDir.length > targetDir.length) {
+          if (!allDirsToClean.includes(parentDir)) {
+            allDirsToClean.push(parentDir)
+          }
+          parentDir = path.dirname(parentDir)
+        }
       }
     }
 
@@ -797,19 +813,22 @@ ipcMain.handle('restore-all-mods', async (event, { gameId }) => {
     game.mods[i].installed = false
   }
 
-  // 清理所有 Mod 创建的空目录（从最深层的目录开始）
-  const sortedDirs = allCreatedDirs.sort((a, b) => b.path.length - a.path.length)
-  for (const dirInfo of sortedDirs) {
+  // 从最深层的目录开始清理空目录
+  const sortedDirs = allDirsToClean.sort((a, b) => b.length - a.length)
+  console.log('待清理目录:', sortedDirs)
+  
+  for (const dirPath of sortedDirs) {
     try {
-      const dirPath = dirInfo.path
       if (await fs.pathExists(dirPath)) {
         const contents = await fs.readdir(dirPath).catch(() => null)
+        console.log(`检查目录 ${dirPath}:`, contents ? `包含 ${contents.length} 项` : '无法读取')
         if (contents && contents.length === 0) {
           await fs.remove(dirPath)
+          console.log('已删除空目录:', dirPath)
         }
       }
     } catch (err) {
-      // 忽略删除空目录的错误
+      console.log('清理目录出错:', dirPath, err.message)
     }
   }
   
